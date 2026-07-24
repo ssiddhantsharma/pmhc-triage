@@ -2,10 +2,25 @@ import pytest
 
 from pmhc_triage.hla import (
     coverage_by_population,
+    hla_class,
     normalize_allele,
     parse_locus,
     population_coverage,
 )
+
+
+def test_hla_class():
+    assert hla_class("A*02:01") == "I"
+    assert hla_class("DRB1*15:01") == "II"
+    assert hla_class("DQB1*06:02") == "II"
+    assert hla_class("garbage") == "unknown"
+
+
+def test_class_ii_coverage_computes_with_caveat():
+    # DRB1 coverage works (locus-generic math) and carries the heterodimer caveat
+    s = population_coverage(["DRB1*15:01"], {"DRB1*15:01": 0.13}, "Europe")
+    assert s.value == pytest.approx(1 - (1 - 0.13) ** 2)  # 0.2431
+    assert any("class II" in w for w in s.warnings)
 
 
 # --- allele string handling -------------------------------------------------

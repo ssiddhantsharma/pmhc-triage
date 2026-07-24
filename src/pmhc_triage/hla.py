@@ -55,6 +55,22 @@ def normalize_allele(allele: str) -> str:
     return a
 
 
+_CLASS_I_LOCI = {"A", "B", "C"}
+
+
+def hla_class(allele: str) -> str:
+    """Return 'I', 'II', or 'unknown' for an allele (by locus)."""
+    try:
+        locus = parse_locus(allele)
+    except ValueError:
+        return "unknown"
+    if locus in _CLASS_I_LOCI:
+        return "I"
+    if locus.startswith(("DR", "DQ", "DP")):
+        return "II"
+    return "unknown"
+
+
 def parse_locus(allele: str) -> str:
     """Return the locus (gene) of an allele, e.g. ``A*02:01`` -> ``A``.
 
@@ -139,6 +155,12 @@ def population_coverage(
         result.warn(
             "excluded (no frequency in "
             f"{population!r}, NOT treated as 0): {', '.join(sorted(missing))}"
+        )
+    if any(hla_class(a) == "II" for a in covering):
+        result.warn(
+            "class II alleles present: DR (via DRB1) is a valid proxy (invariant alpha chain), "
+            "but DQ/DP are alpha-beta heterodimers -- coverage over the beta locus alone ignores "
+            "alpha-chain pairing and is approximate"
         )
     return result
 

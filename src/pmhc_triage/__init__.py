@@ -13,7 +13,7 @@ from .antigen import resolve_entrez, variant_frequency, variant_frequency_multi
 from .burden import bundled_diseases, load_bundled, load_burden_table, manual_incidence
 from .caching import cached_client
 from .score import PopulationScore, TargetScore, score_target
-from .hla import coverage_by_population, normalize_allele, parse_locus, population_coverage
+from .hla import coverage_by_population, hla_class, normalize_allele, parse_locus, population_coverage
 from .identity import (
     align_populations,
     canonical_disease,
@@ -48,6 +48,7 @@ __all__ = [
     "coverage_by_population",
     "parse_locus",
     "normalize_allele",
+    "hla_class",
     "fetch_uniprot_sequence",
     "mutant_peptides",
     "parse_substitution",
