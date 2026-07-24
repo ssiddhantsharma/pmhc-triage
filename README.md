@@ -47,7 +47,23 @@ pmhc-triage discover --disease "pancreatic cancer" --top 20 --out targets.csv
 pmhc-triage run --config targets.yaml --out batch.csv
 ```
 
-`--cache DIR` makes any run reproducible/offline: responses are stored query-date-stamped and replayed byte-identically.
+`--cache DIR` makes any run reproducible/offline: responses are stored with the real fetch datetime and replayed byte-identically (provenance reports the original fetch time, not the re-run).
+
+### Advanced modes
+
+```bash
+# predict presenting alleles instead of supplying them (needs [presentation] extra)
+pmhc-triage score --gene KRAS --variant G12D --disease PDAC --study paad_tcga_pan_can_atlas_2018 \
+  --predict-alleles --uniprot P01116 --presentation-threshold 2 --populations Europe --freqs afnd.tsv --burden b.csv
+
+# pool the antigen fraction across studies and/or variants (per-study N recorded)
+pmhc-triage score ... --studies "paad_tcga_pan_can_atlas_2018,paad_cptac_2021" --variants "G12D,G12V,G12C"
+
+# expression antigen (cancer-testis antigens like PRAME): RNA-seq z-score instead of a mutation
+pmhc-triage score --gene PRAME --antigen-mode expression --expression-threshold 1.0 --disease ... --study ...
+
+# HLA class II works too (DRB1 is a valid proxy; DQ/DP carry an alpha-beta heterodimer caveat)
+```
 
 ### YAML config (`run`)
 
