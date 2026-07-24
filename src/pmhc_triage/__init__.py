@@ -20,7 +20,9 @@ from .opentargets import (
     tractability,
 )
 from .peptides import mutant_peptides, parse_substitution
+from .pipeline import TargetSpec, preflight, run_target
 from .provenance import Provenance, Sourced, today_iso
+from .report import write_provenance_json, write_results_csv
 from .sequences import fetch_uniprot_sequence
 
 __version__ = "0.0.1"
@@ -49,5 +51,10 @@ __all__ = [
     "score_target",
     "TargetScore",
     "PopulationScore",
+    "TargetSpec",
+    "run_target",
+    "preflight",
+    "write_results_csv",
+    "write_provenance_json",
     "__version__",
 ]

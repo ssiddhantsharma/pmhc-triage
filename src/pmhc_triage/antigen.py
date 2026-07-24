@@ -56,6 +56,20 @@ def resolve_entrez(gene: str, *, client: httpx.Client | None = None, timeout: fl
     return Sourced(int(eid), prov)
 
 
+def check_study(study_id: str, *, client: httpx.Client | None = None, timeout: float = 30.0) -> Sourced[bool]:
+    """Preflight: does the cBioPortal study exist (and does its _sequenced list resolve)?"""
+    url = f"{API}/sample-lists/{study_id}_sequenced"
+    prov = Provenance(source=_SOURCE, url=url, query_date=today_iso(),
+                      method="cBioPortal study preflight (_sequenced sample list)")
+    data, err = _request("GET", url, client, timeout)
+    if err:
+        return Sourced(False, prov).warn(err)
+    n = len((data or {}).get("sampleIds", []))
+    if n == 0:
+        return Sourced(False, prov).warn(f"{study_id!r} has no sequenced samples")
+    return Sourced(True, prov)
+
+
 def variant_frequency(
     study_id: str,
     protein_change: str,
