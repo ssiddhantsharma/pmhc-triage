@@ -16,9 +16,11 @@ Citing Open Targets is courtesy (CC0).
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import httpx
 
-from .provenance import Provenance, Sourced, today_iso
+from .provenance import Provenance, Sourced, fetched_at_or_today, today_iso
 
 ENDPOINT = "https://api.platform.opentargets.org/api/v4/graphql"
 _SOURCE = "Open Targets Platform GraphQL"
@@ -29,23 +31,23 @@ def _post(
     variables: dict,
     client: httpx.Client | None,
     timeout: float,
-) -> tuple[dict | None, str | None]:
-    """POST a GraphQL query. Returns ``(data, None)`` or ``(None, error_message)``."""
+) -> tuple[dict | None, str | None, str | None]:
+    """POST a GraphQL query. Returns ``(data, error, fetched_at)`` (fetched_at None on error)."""
     owns = client is None
     client = client or httpx.Client(timeout=timeout)
     try:
         resp = client.post(ENDPOINT, json={"query": query, "variables": variables})
     except httpx.HTTPError as exc:
-        return None, f"request to Open Targets failed: {exc}"
+        return None, f"request to Open Targets failed: {exc}", None
     finally:
         if owns:
             client.close()
     if resp.status_code != 200:
-        return None, f"HTTP {resp.status_code} from Open Targets"
+        return None, f"HTTP {resp.status_code} from Open Targets", None
     body = resp.json()
     if body.get("errors"):
-        return None, f"GraphQL errors: {body['errors']}"
-    return body.get("data"), None
+        return None, f"GraphQL errors: {body['errors']}", None
+    return body.get("data"), None, fetched_at_or_today(resp)
 
 
 def resolve_target(symbol: str, *, client: httpx.Client | None = None, timeout: float = 30.0) -> Sourced[str]:
@@ -57,7 +59,7 @@ def resolve_target(symbol: str, *, client: httpx.Client | None = None, timeout: 
         method=f"search(entityNames=[target]) for {symbol!r} -> Ensembl gene id",
     )
     q = 'query($q:String!){ search(queryString:$q, entityNames:["target"]){ hits { id name entity } } }'
-    data, err = _post(q, {"q": symbol}, client, timeout)
+    data, err, fa = _post(q, {"q": symbol}, client, timeout)
     if err:
         return Sourced(None, prov).warn(err)
     hits = (data or {}).get("search", {}).get("hits", [])
@@ -65,7 +67,7 @@ def resolve_target(symbol: str, *, client: httpx.Client | None = None, timeout: 
     chosen = (exact or hits or [None])[0]
     if not chosen:
         return Sourced(None, prov).warn(f"no target hit for {symbol!r}")
-    result = Sourced(chosen["id"], prov)
+    result = Sourced(chosen["id"], replace(prov, query_date=fa))
     if not exact:
         result.warn(f"no exact symbol match; using top hit {chosen.get('name')} ({chosen['id']})")
     return result
@@ -80,14 +82,14 @@ def resolve_disease(name: str, *, client: httpx.Client | None = None, timeout: f
         method=f"search(entityNames=[disease]) for {name!r} -> EFO/MONDO id",
     )
     q = 'query($q:String!){ search(queryString:$q, entityNames:["disease"]){ hits { id name entity } } }'
-    data, err = _post(q, {"q": name}, client, timeout)
+    data, err, fa = _post(q, {"q": name}, client, timeout)
     if err:
         return Sourced(None, prov).warn(err)
     hits = (data or {}).get("search", {}).get("hits", [])
     if not hits:
         return Sourced(None, prov).warn(f"no disease hit for {name!r}")
     top = hits[0]
-    result = Sourced(top["id"], prov)
+    result = Sourced(top["id"], replace(prov, query_date=fa))
     if top.get("name", "").lower() != name.lower():
         result.warn(f"using top hit {top.get('name')!r} ({top['id']}) for query {name!r}")
     return result
@@ -102,13 +104,13 @@ def tractability(ensembl_id: str, *, client: httpx.Client | None = None, timeout
         method="target.tractability (SM/AB buckets; context only, not a pMHC-score driver)",
     )
     q = 'query($id:String!){ target(ensemblId:$id){ approvedSymbol tractability { label modality value } } }'
-    data, err = _post(q, {"id": ensembl_id}, client, timeout)
+    data, err, fa = _post(q, {"id": ensembl_id}, client, timeout)
     if err:
         return Sourced(None, prov).warn(err)
     target = (data or {}).get("target")
     if not target:
         return Sourced(None, prov).warn(f"no target for {ensembl_id!r}")
-    return Sourced(target.get("tractability", []), prov)
+    return Sourced(target.get("tractability", []), replace(prov, query_date=fa))
 
 
 def associated_targets(
@@ -133,7 +135,7 @@ def associated_targets(
         "query($id:String!,$n:Int!){ disease(efoId:$id){ name "
         "associatedTargets(page:{index:0,size:$n}){ count rows { score target { id approvedSymbol } } } } }"
     )
-    data, err = _post(q, {"id": disease_id, "n": top}, client, timeout)
+    data, err, fa = _post(q, {"id": disease_id, "n": top}, client, timeout)
     if err:
         return Sourced(None, prov).warn(err)
     disease = (data or {}).get("disease")
@@ -148,4 +150,4 @@ def associated_targets(
         }
         for r in rows
     ]
-    return Sourced(parsed, prov)
+    return Sourced(parsed, replace(prov, query_date=fa))

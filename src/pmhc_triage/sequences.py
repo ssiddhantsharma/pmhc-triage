@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import httpx
 
-from .provenance import Provenance, Sourced, today_iso
+from .provenance import Provenance, Sourced, fetched_at_or_today, today_iso
 
 UNIPROT_FASTA = "https://rest.uniprot.org/uniprotkb/{accession}.fasta"
 
@@ -32,13 +32,12 @@ def fetch_uniprot_sequence(
     for hermetic testing.
     """
     url = UNIPROT_FASTA.format(accession=accession)
-    prov = Provenance(
-        source=f"UniProt {accession}",
-        url=url,
-        query_date=today_iso(),
-        method="REST .fasta canonical sequence",
-    )
 
+    def prov_with(date: str) -> Provenance:
+        return Provenance(source=f"UniProt {accession}", url=url, query_date=date,
+                          method="REST .fasta canonical sequence")
+
+    prov = prov_with(today_iso())
     owns_client = client is None
     client = client or httpx.Client(timeout=timeout, follow_redirects=True)
     try:
@@ -62,4 +61,4 @@ def fetch_uniprot_sequence(
     if not seq:
         return Sourced(None, prov).warn("FASTA had a header but no sequence residues")
 
-    return Sourced(seq, prov)
+    return Sourced(seq, prov_with(fetched_at_or_today(resp)))

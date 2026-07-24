@@ -33,6 +33,25 @@ def today_iso() -> str:
     return datetime.now(timezone.utc).date().isoformat()
 
 
+# Header the caching transport sets to the datetime data was ACTUALLY fetched.
+CACHE_FETCHED_AT_HEADER = "x-pmhc-fetched-at"
+
+
+def fetched_at_or_today(response) -> str:
+    """When the data was really fetched.
+
+    If ``response`` came from the on-disk cache, this is the ORIGINAL fetch datetime
+    (so provenance never claims a re-run date it didn't happen on). For a fresh
+    fetch the header is absent and we fall back to today's date. This keeps
+    ``query_date`` honest whether or not caching is used.
+    """
+    try:
+        value = response.headers.get(CACHE_FETCHED_AT_HEADER)
+    except Exception:
+        value = None
+    return value or today_iso()
+
+
 @dataclass(frozen=True)
 class Provenance:
     """Where one datum came from. ``source`` is required; the rest are optional."""

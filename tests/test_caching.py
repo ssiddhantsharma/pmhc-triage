@@ -78,3 +78,23 @@ def test_integration_second_run_is_fully_cached(tmp_path):
     s2 = variant_frequency("paad_tcga_pan_can_atlas_2018", "G12D", client=c)
     assert s1.value == s2.value
     assert calls["n"] == first  # second run entirely from cache
+
+
+def test_provenance_query_date_is_fetch_time_not_rerun_time(tmp_path):
+    """A cached run must report the ORIGINAL fetch datetime, not today (no lying)."""
+    from pmhc_triage.antigen import variant_frequency
+
+    def handler(request):
+        p = request.url.path
+        if "/genes/" in p:
+            return httpx.Response(200, json={"entrezGeneId": 3845})
+        if "/sample-lists/" in p:
+            return httpx.Response(200, json={"sampleIds": [f"S{i}" for i in range(179)]})
+        return httpx.Response(200, json=[{"sampleId": f"S{i}", "proteinChange": "G12D"} for i in range(49)])
+
+    c = httpx.Client(transport=CachingTransport(tmp_path, inner=httpx.MockTransport(handler)))
+    s1 = variant_frequency("paad_tcga_pan_can_atlas_2018", "G12D", client=c)  # MISS
+    s2 = variant_frequency("paad_tcga_pan_can_atlas_2018", "G12D", client=c)  # HIT
+    # both stamped from the cache's fetched_at (full ISO w/ 'T'), and identical
+    assert "T" in s1.provenance.query_date  # a real fetch timestamp, not a bare re-run date
+    assert s1.provenance.query_date == s2.provenance.query_date

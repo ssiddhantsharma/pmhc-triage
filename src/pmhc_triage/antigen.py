@@ -19,9 +19,11 @@ different source -- out of this function; supply that fraction manually.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import httpx
 
-from .provenance import Provenance, Sourced, today_iso
+from .provenance import Provenance, Sourced, fetched_at_or_today, today_iso
 from .uncertainty import wilson_ci
 
 API = "https://www.cbioportal.org/api"
@@ -34,13 +36,13 @@ def _request(method, url, client, timeout, *, json=None):
     try:
         resp = client.request(method, url, json=json, headers={"Accept": "application/json"})
     except httpx.HTTPError as exc:
-        return None, f"cBioPortal request failed: {exc}"
+        return None, f"cBioPortal request failed: {exc}", None
     finally:
         if owns:
             client.close()
     if resp.status_code != 200:
-        return None, f"HTTP {resp.status_code} for {url}"
-    return resp.json(), None
+        return None, f"HTTP {resp.status_code} for {url}", None
+    return resp.json(), None, fetched_at_or_today(resp)
 
 
 def resolve_entrez(gene: str, *, client: httpx.Client | None = None, timeout: float = 30.0) -> Sourced[int]:
@@ -48,13 +50,13 @@ def resolve_entrez(gene: str, *, client: httpx.Client | None = None, timeout: fl
     url = f"{API}/genes/{gene}"
     prov = Provenance(source=_SOURCE, url=url, query_date=today_iso(),
                       method="cBioPortal /genes lookup -> entrezGeneId")
-    data, err = _request("GET", url, client, timeout)
+    data, err, fa = _request("GET", url, client, timeout)
     if err:
         return Sourced(None, prov).warn(err)
     eid = (data or {}).get("entrezGeneId")
     if eid is None:
         return Sourced(None, prov).warn(f"no Entrez id for gene {gene!r}")
-    return Sourced(int(eid), prov)
+    return Sourced(int(eid), replace(prov, query_date=fa))
 
 
 def check_study(study_id: str, *, client: httpx.Client | None = None, timeout: float = 30.0) -> Sourced[bool]:
@@ -62,13 +64,13 @@ def check_study(study_id: str, *, client: httpx.Client | None = None, timeout: f
     url = f"{API}/sample-lists/{study_id}_sequenced"
     prov = Provenance(source=_SOURCE, url=url, query_date=today_iso(),
                       method="cBioPortal study preflight (_sequenced sample list)")
-    data, err = _request("GET", url, client, timeout)
+    data, err, fa = _request("GET", url, client, timeout)
     if err:
         return Sourced(False, prov).warn(err)
     n = len((data or {}).get("sampleIds", []))
     if n == 0:
         return Sourced(False, prov).warn(f"{study_id!r} has no sequenced samples")
-    return Sourced(True, prov)
+    return Sourced(True, replace(prov, query_date=fa))
 
 
 def variant_frequency(
@@ -105,7 +107,7 @@ def variant_frequency(
         entrez = resolved.value
 
     # denominator: number of sequenced samples
-    sl_data, err = _request("GET", f"{API}/sample-lists/{sample_list}", client, timeout)
+    sl_data, err, _ = _request("GET", f"{API}/sample-lists/{sample_list}", client, timeout)
     if err:
         return Sourced(None, prov(context)).warn(err)
     denom = len((sl_data or {}).get("sampleIds", []))
@@ -116,7 +118,7 @@ def variant_frequency(
 
     # numerator: distinct samples with the exact protein change
     body = {"sampleListId": sample_list, "entrezGeneIds": [entrez]}
-    muts, err = _request(
+    muts, err, fa = _request(
         "POST", f"{API}/molecular-profiles/{profile}/mutations/fetch", client, timeout, json=body
     )
     if err:
@@ -128,9 +130,12 @@ def variant_frequency(
     ci_low, ci_high = wilson_ci(numer, denom)
     result = Sourced(
         fraction,
-        prov(
-            f"{protein_change}: {numer}/{denom} sequenced samples in {study_id} "
-            f"(cBioPortal ODbL; profile {profile})"
+        replace(
+            prov(
+                f"{protein_change}: {numer}/{denom} sequenced samples in {study_id} "
+                f"(cBioPortal ODbL; profile {profile})"
+            ),
+            query_date=fa,
         ),
     )
     result.extra = {
