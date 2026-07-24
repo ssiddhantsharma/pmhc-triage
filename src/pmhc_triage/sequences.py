@@ -1,10 +1,10 @@
 """Protein sequences from UniProt -- always the primary source, never a summary.
 
-CLAUDE-lesson encoded here: a WebFetch/LLM summary once reported a UniProt length
-of 2803 aa for a 2201-aa protein and invented residue boundaries, which would have
-silently shifted every downstream contact/peptide index. So this module pulls the
-canonical sequence straight from the UniProt REST ``.fasta`` endpoint and records
-the exact URL + query date in the provenance. It never guesses a sequence.
+Text/LLM summaries of UniProt entries can misreport sequence length and invent
+residue boundaries, which would silently shift every downstream peptide index. So
+this module pulls the canonical sequence straight from the UniProt REST ``.fasta``
+endpoint and records the exact URL + query date in the provenance. It never
+guesses a sequence.
 """
 
 from __future__ import annotations
