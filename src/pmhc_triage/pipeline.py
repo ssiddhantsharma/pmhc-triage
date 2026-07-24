@@ -22,6 +22,7 @@ from .afnd import load_afnd_frequencies
 from .antigen import check_study, resolve_entrez, variant_frequency
 from .burden import load_burden_table, manual_incidence
 from .hla import coverage_by_population, normalize_allele
+from .identity import suggest_match
 from .opentargets import resolve_target, tractability
 from .peptides import parse_substitution
 from .presentation import manual_presenting_alleles
@@ -116,7 +117,9 @@ def preflight(spec: TargetSpec, *, client: httpx.Client | None = None) -> list[s
         norm_alleles = [normalize_allele(a) for a in spec.alleles]
         for pop in spec.populations:
             if pop not in ft.by_population:
-                issues.append(f"population {pop!r} absent from frequency file (join would fail)")
+                hint = suggest_match(pop, ft.by_population.keys())
+                suffix = f" -- did you mean {hint!r}? (label alias)" if hint else ""
+                issues.append(f"population {pop!r} absent from frequency file (join would fail){suffix}")
                 continue
             present = {normalize_allele(k) for k in ft.get(pop)}
             missing = [a for a in norm_alleles if a not in present]
@@ -129,7 +132,9 @@ def preflight(spec: TargetSpec, *, client: httpx.Client | None = None) -> list[s
         loaded = load_burden_table(spec.burden_path, spec.disease)
         for pop in spec.populations:
             if pop not in loaded:
-                issues.append(f"no incidence for {pop!r} (disease {spec.disease!r}) in burden file")
+                hint = suggest_match(pop, loaded.keys())
+                suffix = f" -- did you mean {hint!r}? (label alias)" if hint else ""
+                issues.append(f"no incidence for {pop!r} (disease {spec.disease!r}) in burden file{suffix}")
     elif not spec.burden_manual:
         issues.append("no burden source supplied -> incidence will be missing")
 

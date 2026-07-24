@@ -13,6 +13,12 @@ from .antigen import resolve_entrez, variant_frequency
 from .burden import load_burden_table, manual_incidence
 from .score import PopulationScore, TargetScore, score_target
 from .hla import coverage_by_population, normalize_allele, parse_locus, population_coverage
+from .identity import (
+    align_populations,
+    canonical_disease,
+    canonical_population,
+    suggest_match,
+)
 from .opentargets import (
     associated_targets,
     resolve_disease,
@@ -64,5 +70,9 @@ __all__ = [
     "manual_presenting_alleles",
     "predict_presenting_alleles",
     "select_presenting",
+    "canonical_population",
+    "canonical_disease",
+    "suggest_match",
+    "align_populations",
     "__version__",
 ]

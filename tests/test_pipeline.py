@@ -88,3 +88,10 @@ def test_preflight_catches_wt_mismatch(tmp_path):
     spec = _spec(tmp_path, variant="A12D", uniprot="P01116")  # seq has G at 12, not A
     issues = preflight(spec, client=_routing_client())
     assert any("WT mismatch" in i for i in issues)
+
+
+def test_preflight_suggests_population_alias(tmp_path):
+    # freqs file uses "Europe"; request "European" -> preflight should suggest the alias
+    spec = _spec(tmp_path, populations=["European"])
+    issues = preflight(spec, client=_routing_client())
+    assert any("did you mean 'Europe'" in i for i in issues)
