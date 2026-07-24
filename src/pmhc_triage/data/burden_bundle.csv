@@ -1,0 +1,6 @@
+disease,population,incidence,source,note
+pancreatic cancer,World,510992,"GLOBOCAN 2022 (Bray et al. 2024, CA Cancer J Clin 74:229-263)","world annual new cases (pancreas, all); ~90% is PDAC; verify/refine per-region at gco.iarc.fr"
+lung cancer,World,2480000,"GLOBOCAN 2022 (Bray et al. 2024, CA Cancer J Clin 74:229-263)","~2.48M world annual new cases (12.4% of all cancers); verify at gco.iarc.fr"
+colorectal carcinoma,World,1930000,"GLOBOCAN 2022 (Bray et al. 2024, CA Cancer J Clin 74:229-263)","approximate (~9.6% of ~20M); verify exact at gco.iarc.fr"
+stomach cancer,World,970000,"GLOBOCAN 2022 (Bray et al. 2024, CA Cancer J Clin 74:229-263)","approximate (~4.9% of ~20M); verify exact at gco.iarc.fr"
+female breast cancer,World,2300000,"GLOBOCAN 2022 (Bray et al. 2024, CA Cancer J Clin 74:229-263)","approximate (~11.6% of ~20M); verify exact at gco.iarc.fr"

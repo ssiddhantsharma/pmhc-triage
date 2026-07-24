@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from .afnd import FrequencyTable, load_afnd_frequencies
 from .antigen import resolve_entrez, variant_frequency
-from .burden import load_burden_table, manual_incidence
+from .burden import bundled_diseases, load_bundled, load_burden_table, manual_incidence
 from .caching import cached_client
 from .score import PopulationScore, TargetScore, score_target
 from .hla import coverage_by_population, normalize_allele, parse_locus, population_coverage
@@ -60,6 +60,8 @@ __all__ = [
     "resolve_entrez",
     "manual_incidence",
     "load_burden_table",
+    "load_bundled",
+    "bundled_diseases",
     "score_target",
     "TargetScore",
     "PopulationScore",

@@ -12,11 +12,47 @@ silent-error hazard, so keep the labels identical to those in your frequency tab
 
 from __future__ import annotations
 
+import io
+from importlib.resources import files
 from pathlib import Path
 
 import pandas as pd
 
 from .provenance import Provenance, Sourced, today_iso
+
+
+def _bundle_df() -> pd.DataFrame:
+    text = files("pmhc_triage").joinpath("data/burden_bundle.csv").read_text()
+    return pd.read_csv(io.StringIO(text))
+
+
+def bundled_diseases() -> list[str]:
+    """Disease labels available in the shipped GLOBOCAN-2022 starter bundle."""
+    return sorted(_bundle_df()["disease"].unique().tolist())
+
+
+def load_bundled(disease: str, *, population: str = "World") -> Sourced[float]:
+    """Incidence from the shipped curated bundle (World-level, cited).
+
+    These are convenience starter values (GLOBOCAN 2022) with the citation carried
+    in the provenance; refine per-region for a real analysis. Returns a surfaced
+    *missing* if the disease/population isn't in the bundle.
+    """
+    df = _bundle_df()
+    prov = Provenance(source="pmhc-triage curated bundle", query_date=today_iso(),
+                      method=f"bundled GLOBOCAN-2022 incidence for {disease!r} / {population!r}")
+    hits = df[(df["disease"].str.lower() == disease.strip().lower())
+              & (df["population"].str.lower() == population.strip().lower())]
+    if hits.empty:
+        return Sourced(None, prov).warn(
+            f"{disease!r}/{population!r} not in bundle; available: {bundled_diseases()}"
+        )
+    row = hits.iloc[0]
+    return Sourced(
+        float(row["incidence"]),
+        Provenance(source=str(row["source"]), query_date=today_iso(),
+                   method=f"curated GLOBOCAN-2022 bundle: {row['note']}"),
+    )
 
 
 def manual_incidence(
