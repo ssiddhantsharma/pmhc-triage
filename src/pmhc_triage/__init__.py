@@ -8,6 +8,7 @@ Public API is intentionally small and grows as modules land. Currently:
 
 from __future__ import annotations
 
+from .afnd import FrequencyTable, load_afnd_frequencies
 from .hla import coverage_by_population, normalize_allele, parse_locus, population_coverage
 from .peptides import mutant_peptides, parse_substitution
 from .provenance import Provenance, Sourced, today_iso
