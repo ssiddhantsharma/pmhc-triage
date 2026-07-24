@@ -42,30 +42,39 @@ class CachingTransport(httpx.BaseTransport):
         h.update(request.content or b"")
         return h.hexdigest()
 
+    # The inner transport's .read() returns ALREADY-DECODED bytes, but leaves the
+    # content-encoding header in place. So we must drop content-encoding (else the
+    # client tries to gunzip plain data -> "incorrect header check") and
+    # content-length (httpx recomputes it from the returned content).
+    _DROP_HEADERS = {"content-encoding", "content-length", "transfer-encoding"}
+
+    @classmethod
+    def _replay_headers(cls, stored: dict) -> dict:
+        return {k: v for k, v in stored.items() if k.lower() not in cls._DROP_HEADERS}
+
     def handle_request(self, request: httpx.Request) -> httpx.Response:
         path = self.cache_dir / f"{self._key(request)}.json"
         if path.exists():
             rec = json.loads(path.read_text())
             content = base64.b64decode(rec["content_b64"])
-            return httpx.Response(
-                rec["status"],
-                content=content,
-                headers={"x-pmhc-cache": "HIT", "x-pmhc-fetched-at": rec["fetched_at"]},
-                request=request,
-            )
+            headers = self._replay_headers(rec.get("headers", {}))
+            headers.update({"x-pmhc-cache": "HIT", "x-pmhc-fetched-at": rec["fetched_at"]})
+            return httpx.Response(rec["status"], content=content, headers=headers, request=request)
+
         resp = self.inner.handle_request(request)
         body = resp.read()
         fetched_at = _fetched_at()
+        stored_headers = self._replay_headers(dict(resp.headers))
         rec = {
             "method": request.method,
             "url": str(request.url),
             "status": resp.status_code,
             "content_b64": base64.b64encode(body).decode(),
+            "headers": stored_headers,
             "fetched_at": fetched_at,
         }
         path.write_text(json.dumps(rec))
-        headers = dict(resp.headers)
-        headers.update({"x-pmhc-cache": "MISS", "x-pmhc-fetched-at": fetched_at})
+        headers = {**stored_headers, "x-pmhc-cache": "MISS", "x-pmhc-fetched-at": fetched_at}
         return httpx.Response(resp.status_code, content=body, headers=headers, request=request)
 
 
