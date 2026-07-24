@@ -1,52 +1,107 @@
 # pmhc-triage
 
-**HLA-coverage-adjusted effective addressable-population estimates for pMHC / T-cell immunotherapy targets.**
+**HLA-coverage-adjusted effective addressable-population estimates for pMHC / T-cell immunotherapy targets** — with a source on every number.
 
 ## Statement of need
 
-Target prioritization tools (e.g. Open Targets) are disease-agnostic and ignore the one variable unique to pMHC-directed therapeutics: **HLA restriction**. A binder against *peptide-X on HLA-A\*02:01* is useless in an A\*02:01-negative patient. Raw disease incidence therefore overstates who a pMHC therapeutic can actually reach.
+Target-prioritization tools (e.g. Open Targets) are disease-agnostic and ignore the one variable unique to pMHC-directed therapeutics: **HLA restriction**. A binder against *peptide-X on HLA-A\*02:01* is useless in an A\*02:01-negative patient, so raw disease incidence overstates who a pMHC therapeutic can reach.
 
-`pmhc-triage` estimates the **effective addressable patient population** for a pMHC target:
+`pmhc-triage` estimates the **effective addressable patient population**:
 
 ```
 effective addressable N = disease incidence
                         × antigen-positive fraction
-                        × HLA population coverage (of the alleles that present the peptide)
+                        × HLA population coverage (of the alleles presenting the peptide)
 ```
 
-…and attaches Open Targets tractability as context. **Every output number carries its source, URL, query date, and derivation method** (provenance-first): the point is sourced, reproducible numbers — exactly what a language model cannot be trusted to give.
+…attaches Open Targets tractability as context, and carries a **provenance record on every value** (source, URL, query date, method) — because sourced, reproducible numbers are exactly what a language model can't be trusted to give.
 
-## Scope
+## Install
 
-| In scope | Out of scope |
-|---|---|
-| pMHC / T-cell targets (HLA-restricted) | Non-pMHC modalities — the formula (`× HLA coverage × presentation`) is undefined without an MHC |
-| Disease → candidate-target discovery (chains Open Targets, optional) | Computed TAM / pricing forecast — that's judgment; faking it discredits the provenance premise |
-| Analog pricing *anchors* (sourced reference, never multiplied) | Disease-agnostic discovery as a product (that's Open Targets' job) |
+```bash
+pip install -e ".[dev]"            # core + test tooling
+pip install -e ".[presentation]"   # optional: MHCflurry allele prediction (torch backend)
+mhcflurry-downloads fetch models_class1_presentation   # once, if using presentation
+```
 
-**Principle:** compute anything with a full sourced provenance chain; refuse anything that requires a forecast assumption.
+Core has no heavy deps (numpy, pandas, httpx, pyyaml). MHCflurry is optional — the manual-allele path runs without it.
+
+## Commands
+
+```bash
+# 1) validate — fail-fast preflight (study resolves? populations in freq file? variant WT matches UniProt?)
+pmhc-triage validate --gene KRAS --variant G12D --disease PDAC \
+  --study paad_tcga_pan_can_atlas_2018 --alleles "A*11:01,A*03:01" \
+  --populations Europe,EastAsia --freqs afnd.tsv --burden burden.csv --uniprot P01116
+
+# 2) score — one target from flags -> results.csv + results.provenance.json
+pmhc-triage score --gene KRAS --variant G12D --disease PDAC \
+  --study paad_tcga_pan_can_atlas_2018 --alleles "A*11:01,A*03:01" \
+  --populations Europe,EastAsia --freqs afnd.tsv --burden burden.csv \
+  --cache .cache --out kras.csv
+
+# 3) discover — disease -> candidate targets (Open Targets association; feed into `score`)
+pmhc-triage discover --disease "pancreatic cancer" --top 20 --out targets.csv
+
+# 4) run — batch from a YAML config
+pmhc-triage run --config targets.yaml --out batch.csv
+```
+
+`--cache DIR` makes any run reproducible/offline: responses are stored query-date-stamped and replayed byte-identically.
+
+### YAML config (`run`)
+
+```yaml
+targets:
+  - gene: KRAS
+    variant: G12D
+    disease: PDAC
+    study: paad_tcga_pan_can_atlas_2018
+    alleles: [A*11:01, A*03:01]
+    populations: [Europe, EastAsia]
+    freqs: afnd.tsv
+    burden: {Europe: 100000, EastAsia: 150000}   # inline, or a path to a CSV
+    uniprot: P01116                                # optional, enables WT validation
+```
+
+## Inputs you supply (not bundled)
+
+- **`--freqs`** — an AFND-format allele-frequency table you export (AFND is CC BY-NC; we never redistribute it).
+- **`--burden`** — an incidence CSV (`disease,population,incidence`), or use the shipped cited GLOBOCAN-2022 starter bundle via `pmhc_triage.load_bundled(...)` (World-level; refine per-region).
+- **`--alleles`** — presenting alleles (manual), or predict them with the optional MHCflurry path.
 
 ## Modules
 
 | Module | Role | Source |
 |---|---|---|
-| `provenance` | every value is a `Sourced` datum with its origin | — |
-| `hla` | diploid population coverage (**load-bearing core**) | AFND, Bui et al. 2006 method |
-| `burden` | disease incidence | curated GLOBOCAN/GBD bundle *(planned)* |
-| `antigen` | antigen-positive fraction | cBioPortal REST *(planned)* |
-| `presentation` | peptide → presenting alleles | MHCflurry *(planned)* |
-| `tractability` | druggability context (not a driver of the score) | Open Targets GraphQL *(planned)* |
-| `score` | combine + rank + provenance log | — *(planned)* |
+| `provenance` | every value is a `Sourced` datum (value/source/url/date/method + `extra`) | — |
+| `hla` | diploid population coverage (load-bearing core) | AFND freqs, Bui et al. 2006 method |
+| `sequences` | canonical protein sequence | UniProt REST (CC BY 4.0) |
+| `peptides` | variant → spanning k-mers (refuses on WT mismatch) | — |
+| `presentation` | peptides → presenting alleles | manual, or MHCflurry (Apache-2.0) |
+| `antigen` | antigen-positive fraction (+ N, Wilson CI) | cBioPortal REST (ODbL) |
+| `burden` | incidence (manual / CSV / cited bundle) | GLOBOCAN 2022 (bundle) |
+| `opentargets` | tractability (context) + associated targets (discovery) | Open Targets (CC0) |
+| `identity` | conservative population/disease aliasing + join hints | — |
+| `caching` | on-disk, query-date-stamped, offline replay | — |
+| `score` | the exit gate: join-guard, missing→None (never 0), provenance log | — |
+| `pipeline` | orchestrator (`run_target`) + `preflight` | — |
 
-## Status
+## Design invariants
 
-Early scaffold. Built: the **provenance primitive** and the **`hla` diploid-coverage core** (validated against analytically-derived values; to be cross-checked against the IEDB Population Coverage tool). API-calling modules are next.
+- **Provenance-first.** Every emitted number carries its source; a missing input is surfaced (`None` + reason), never silently zeroed.
+- **Join guard.** Incidence × coverage are combined only per identical population label — never cross-population.
+- **Uncertainty visible.** Fractions carry sample size N and a Wilson 95% CI.
+- **MHC-only, on purpose.** The HLA multiplier only exists for pMHC/T-cell targets; other modalities are out of scope (that's Open Targets' / other tools' turf).
 
-## Install
+## Data-source licenses (verified)
+
+UniProt **CC BY 4.0** · Open Targets data **CC0** / code **Apache-2.0** · MHCflurry **Apache-2.0** · cBioPortal **ODbL** (some studies restrict commercial use) · AFND **CC BY-NC** (not bundled — you supply it). This package is **Apache-2.0** and ships no non-commercially-licensed data.
+
+## Tests
 
 ```bash
-pip install -e ".[dev]"          # core + test tooling
-pip install -e ".[presentation]" # adds MHCflurry (pulls TensorFlow)
+pytest -q        # hermetic (mocked APIs); a gated live MHCflurry test runs if installed
 ```
 
 ## License

@@ -11,7 +11,10 @@ import argparse
 import sys
 from pathlib import Path
 
+import csv
+
 from .caching import cached_client
+from .opentargets import associated_targets, resolve_disease
 from .pipeline import TargetSpec, preflight, run_target
 from .report import write_provenance_json, write_results_csv
 
@@ -70,13 +73,19 @@ def build_parser() -> argparse.ArgumentParser:
         description="HLA-coverage-adjusted effective addressable-population "
         "estimates for pMHC / T-cell immunotherapy targets.",
     )
-    sub = p.add_subparsers(dest="command", metavar="{score,run,validate}")
+    sub = p.add_subparsers(dest="command", metavar="{score,discover,validate,run}")
 
     s = sub.add_parser("score", help="score one target from flags")
     _add_score_args(s)
 
     v = sub.add_parser("validate", help="preflight one target (fail-fast, exits non-zero on issues)")
     _add_score_args(v)
+
+    dsc = sub.add_parser("discover", help="disease -> candidate targets (Open Targets association)")
+    dsc.add_argument("--disease", required=True)
+    dsc.add_argument("--top", type=int, default=20)
+    dsc.add_argument("--out", default="discover.csv")
+    dsc.add_argument("--cache", default=None, help="cache dir for reproducible/offline re-runs")
 
     r = sub.add_parser("run", help="score a batch of targets from a YAML config")
     r.add_argument("--config", required=True)
@@ -129,6 +138,32 @@ def _cmd_validate(a: argparse.Namespace) -> int:
     return 1
 
 
+def _cmd_discover(a: argparse.Namespace) -> int:
+    client = _client(a)
+    try:
+        did = resolve_disease(a.disease, client=client)
+        if did.is_missing:
+            print(f"could not resolve disease {a.disease!r}: {did.warnings}", file=sys.stderr)
+            return 1
+        rows = associated_targets(did.value, top=a.top, client=client)
+    finally:
+        if client is not None:
+            client.close()
+    if rows.is_missing:
+        print(f"no associated targets: {rows.warnings}", file=sys.stderr)
+        return 1
+    with open(a.out, "w", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=["symbol", "ensembl_id", "association_score"])
+        w.writeheader()
+        w.writerows(rows.value)
+    print(f"{a.disease} ({did.value}): top {len(rows.value)} associated targets -> {a.out}")
+    for r in rows.value[:10]:
+        print(f"  {r['symbol']:10s} {r['association_score']:.3f}")
+    print("\nNote: Open Targets association is disease-agnostic; feed these into `score` "
+          "with a variant + study to get pMHC addressable-N.")
+    return 0
+
+
 def _cmd_run(a: argparse.Namespace) -> int:
     import yaml
 
@@ -158,7 +193,13 @@ def main(argv: list[str] | None = None) -> int:
     if not args.command:
         build_parser().print_help()
         return 0
-    return {"score": _cmd_score, "validate": _cmd_validate, "run": _cmd_run}[args.command](args)
+    handlers = {
+        "score": _cmd_score,
+        "validate": _cmd_validate,
+        "discover": _cmd_discover,
+        "run": _cmd_run,
+    }
+    return handlers[args.command](args)
 
 
 if __name__ == "__main__":
