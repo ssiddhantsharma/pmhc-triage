@@ -38,6 +38,8 @@ def _spec_from_args(a: argparse.Namespace) -> TargetSpec:
         presentation_threshold=getattr(a, "presentation_threshold", 2.0),
         studies=_csv_list(a.studies) or None,
         variants=_csv_list(a.variants) or None,
+        antigen_mode=getattr(a, "antigen_mode", "mutation"),
+        expression_threshold=getattr(a, "expression_threshold", 1.0),
     )
 
 
@@ -60,7 +62,11 @@ def _print_summary(spec: TargetSpec, ts) -> None:
 
 def _add_score_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--gene", required=True)
-    p.add_argument("--variant", required=True, help="e.g. G12D")
+    p.add_argument("--variant", default="", help="e.g. G12D (required for mutation mode)")
+    p.add_argument("--antigen-mode", dest="antigen_mode", choices=["mutation", "expression"],
+                   default="mutation", help="mutation (variant) or expression (RNA-seq, e.g. CTAs)")
+    p.add_argument("--expression-threshold", dest="expression_threshold", type=float, default=1.0,
+                   help="expression z-score cutoff for --antigen-mode expression")
     p.add_argument("--disease", required=True)
     p.add_argument("--study", required=True, help="cBioPortal study id")
     p.add_argument("--studies", default="", help="comma-separated study ids to POOL antigen fraction over")

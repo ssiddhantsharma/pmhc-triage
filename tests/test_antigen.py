@@ -96,6 +96,26 @@ def test_variant_frequency_multi_pools_studies_and_variants():
     assert any("pooled across studies" in w for w in s.warnings)
 
 
+def test_expression_positive_fraction():
+    from pmhc_triage.antigen import expression_positive_fraction
+
+    def handler(request):
+        p = request.url.path
+        if "/genes/" in p:
+            return httpx.Response(200, json={"entrezGeneId": 23532})  # PRAME
+        if p.endswith("/molecular-data/fetch"):
+            # 10 samples: 3 above z-score 1.0
+            vals = [2.5, 3.1, 1.4, 0.2, -0.5, 0.9, 0.1, -1.0, 0.3, 0.8]
+            return httpx.Response(200, json=[{"sampleId": f"S{i}", "value": v} for i, v in enumerate(vals)])
+        return httpx.Response(404)
+
+    c = httpx.Client(transport=httpx.MockTransport(handler))
+    s = expression_positive_fraction("paad_tcga_pan_can_atlas_2018", "PRAME", threshold=1.0, client=c)
+    assert s.value == pytest.approx(3 / 10)  # 3 of 10 above z>1.0
+    assert s.extra["threshold"] == 1.0 and s.extra["denominator"] == 10
+    assert any("judgment call" in w for w in s.warnings)  # threshold disclosed
+
+
 def test_variant_frequency_multi_surfaces_skipped_study():
     from pmhc_triage.antigen import variant_frequency_multi
 

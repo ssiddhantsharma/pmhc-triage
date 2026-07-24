@@ -174,6 +174,70 @@ def variant_frequency(
     return result
 
 
+def expression_positive_fraction(
+    study_id: str,
+    gene: str,
+    *,
+    threshold: float = 1.0,
+    profile: str | None = None,
+    entrez: int | None = None,
+    sample_list: str | None = None,
+    client: httpx.Client | None = None,
+    timeout: float = 30.0,
+) -> Sourced[float]:
+    """Antigen-positive fraction for an EXPRESSION antigen (e.g. a cancer-testis antigen).
+
+    Fraction of profiled tumors expressing ``gene`` above ``threshold`` (default: mRNA
+    z-score > 1.0). This is the semi-manual path the spec called out: the threshold is
+    a judgment call and is surfaced as a warning. Denominator = samples with expression
+    data (may differ from the mutation-sequenced set).
+    """
+    profile = profile or f"{study_id}_rna_seq_v2_mrna_median_Zscores"
+    sample_list = sample_list or f"{study_id}_sequenced"
+    context = f"{gene} expression > {threshold} in {profile}"
+
+    def prov(method: str) -> Provenance:
+        return Provenance(source=_SOURCE, url=API, query_date=today_iso(), method=method)
+
+    if entrez is None:
+        resolved = resolve_entrez(gene, client=client, timeout=timeout)
+        if resolved.is_missing:
+            return Sourced(None, prov(context)).warn(f"could not resolve Entrez id for {gene!r}")
+        entrez = resolved.value
+
+    body = {"sampleListId": sample_list, "entrezGeneIds": [entrez]}
+    data, err, fa = _request(
+        "POST", f"{API}/molecular-profiles/{profile}/molecular-data/fetch", client, timeout, json=body
+    )
+    if err:
+        return Sourced(None, prov(context)).warn(err)
+    vals = [x["value"] for x in (data or []) if isinstance(x.get("value"), (int, float))]
+    denom = len(vals)
+    if denom == 0:
+        return Sourced(None, prov(context)).warn(
+            f"no expression values for {gene!r} in profile {profile!r} (wrong profile/study?)"
+        )
+    numer = sum(1 for v in vals if v > threshold)
+    fraction = round(numer / denom, 6)
+    lo, hi = wilson_ci(numer, denom)
+    unit = "z-score" if "Zscore" in profile else "value"
+    result = Sourced(
+        fraction,
+        replace(prov(f"{gene} expression {unit}>{threshold}: {numer}/{denom} in {profile} "
+                     "(cBioPortal ODbL)"), query_date=fa),
+    )
+    result.extra = {
+        "numerator": numer, "denominator": denom,
+        "ci95_low": round(lo, 6), "ci95_high": round(hi, 6),
+        "threshold": threshold, "profile": profile,
+    }
+    result.warn(
+        f"expression-positivity threshold ({unit} > {threshold}) is a judgment call; "
+        "changing the threshold or profile changes the fraction"
+    )
+    return result
+
+
 def variant_frequency_multi(
     studies,
     protein_changes,

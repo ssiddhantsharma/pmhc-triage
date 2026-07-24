@@ -21,6 +21,7 @@ import httpx
 from .afnd import load_afnd_frequencies
 from .antigen import (
     check_study,
+    expression_positive_fraction,
     resolve_entrez,
     study_cancer_type,
     variant_frequency,
@@ -54,12 +55,14 @@ class TargetSpec:
     presentation_threshold: float = 2.0
     studies: list[str] | None = None   # pool antigen fraction across these (default [study])
     variants: list[str] | None = None  # pool across these variants (default [variant])
+    antigen_mode: str = "mutation"     # "mutation" (cBioPortal variant) or "expression" (RNA-seq)
+    expression_threshold: float = 1.0  # z-score cutoff for expression mode
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "TargetSpec":
         return cls(
             gene=d["gene"],
-            variant=d["variant"],
+            variant=d.get("variant", ""),
             disease=d["disease"],
             study=d["study"],
             alleles=list(d.get("alleles", [])),
@@ -73,6 +76,8 @@ class TargetSpec:
             presentation_threshold=float(d.get("presentation_threshold", 2.0)),
             studies=list(d["studies"]) if d.get("studies") else None,
             variants=list(d["variants"]) if d.get("variants") else None,
+            antigen_mode=d.get("antigen_mode", "mutation"),
+            expression_threshold=float(d.get("expression_threshold", 1.0)),
         )
 
 
@@ -99,12 +104,17 @@ def _predicted_alleles(spec: "TargetSpec", freqs_by_pop: dict, client) -> Source
 
 def run_target(spec: TargetSpec, *, client: httpx.Client | None = None) -> TargetScore:
     """Fetch every factor and combine via the score gate. Missing factors surface, never fake."""
-    studies = spec.studies or [spec.study]
-    variants = spec.variants or [spec.variant]
-    if len(studies) > 1 or len(variants) > 1:
-        antigen = variant_frequency_multi(studies, variants, gene=spec.gene, client=client)
+    if spec.antigen_mode == "expression":
+        antigen = expression_positive_fraction(
+            spec.study, spec.gene, threshold=spec.expression_threshold, client=client
+        )
     else:
-        antigen = variant_frequency(spec.study, spec.variant, gene=spec.gene, client=client)
+        studies = spec.studies or [spec.study]
+        variants = spec.variants or [spec.variant]
+        if len(studies) > 1 or len(variants) > 1:
+            antigen = variant_frequency_multi(studies, variants, gene=spec.gene, client=client)
+        else:
+            antigen = variant_frequency(spec.study, spec.variant, gene=spec.gene, client=client)
 
     tract = None
     tid = resolve_target(spec.gene, client=client)
