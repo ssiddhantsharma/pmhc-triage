@@ -94,6 +94,16 @@ targets:
 - **Uncertainty visible.** Fractions carry sample size N and a Wilson 95% CI.
 - **MHC-only, on purpose.** The HLA multiplier only exists for pMHC/T-cell targets; other modalities are out of scope (that's Open Targets' / other tools' turf).
 
+## Limitations — read before trusting a number
+
+These are real and mostly **not** fixable in code; the tool surfaces them rather than hiding them.
+
+1. **The estimate is unvalidated against ground truth.** The test suite verifies *plumbing* (that each factor is fetched and combined correctly), not that `effective_N` matches any real-world addressable population. Treat outputs as *sourced, reproducible estimates*, not measured truth.
+2. **The multiplicative model assumes independence.** `incidence × antigen-fraction × HLA-coverage` treats the three as independent. They aren't: HLA-driven immunoediting can select against presented neoantigens, so antigen-positivity and HLA type correlate. The point estimate is biased by an unknown amount/direction. (The score output carries this warning.)
+3. **Uncertainty is under-reported.** `effective_n_ci95_antigen_only` propagates *only* the antigen-fraction sampling CI. Incidence and HLA-coverage uncertainty are **not** modeled, so the true interval is wider than shown. And cBioPortal cohorts are convenience samples (referral/sequencing bias), so even the antigen Wilson CI is optimistically narrow.
+4. **Curated burden is World-level.** The shipped bundle can't legitimately join with a population-specific HLA coverage (only with a `World` population). Supply per-region incidence for population-specific estimates; three of the five bundle figures are approximate (flagged at runtime).
+5. **MHCflurry threshold is a lever, not a fact.** Which alleles count as "presenting" depends on `--presentation-threshold` (default 2%); a looser threshold admits more alleles and inflates coverage. Sensitivity is on you.
+
 ## Data-source licenses (verified)
 
 UniProt **CC BY 4.0** · Open Targets data **CC0** / code **Apache-2.0** · MHCflurry **Apache-2.0** · cBioPortal **ODbL** (some studies restrict commercial use) · AFND **CC BY-NC** (not bundled — you supply it). This package is **Apache-2.0** and ships no non-commercially-licensed data.
