@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use pmhc-triage, please cite it as below."
+title: pmhc-triage
+abstract: >-
+  HLA-coverage-adjusted effective addressable-population estimates for pMHC /
+  T-cell immunotherapy targets, with provenance on every value.
+type: software
+authors:
+  - given-names: Siddhant
+    family-names: Sharma
+version: 0.0.1
+license: Apache-2.0
+repository-code: "https://github.com/ssiddhantsharma/pmhc-triage"
+url: "https://github.com/ssiddhantsharma/pmhc-triage"
+keywords:
+  - pmhc
+  - immunotherapy
+  - hla
+  - population-coverage
+  - target-prioritization
+  - bioinformatics

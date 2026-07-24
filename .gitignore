@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# Test / tooling
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Cached API responses / provenance run artifacts (keep out of git)
+.cache/
+*.provenance.json
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/

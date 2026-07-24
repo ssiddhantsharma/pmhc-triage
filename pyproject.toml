@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pmhc-triage"
+version = "0.0.1"
+description = "HLA-coverage-adjusted effective addressable-population estimates for pMHC / T-cell immunotherapy targets"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "Siddhant Sharma" }]
+keywords = [
+  "pmhc",
+  "immunotherapy",
+  "hla",
+  "population-coverage",
+  "target-prioritization",
+  "bioinformatics",
+]
+classifiers = [
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Intended Audience :: Science/Research",
+  "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+dependencies = [
+  "numpy>=1.23",
+  "pandas>=1.5",
+  "httpx>=0.24",
+]
+
+[project.optional-dependencies]
+# mhcflurry pulls in tensorflow; keep it out of the core install.
+presentation = ["mhcflurry>=2.0"]
+dev = ["pytest>=7", "ruff"]
+
+[project.scripts]
+pmhc-triage = "pmhc_triage.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pmhc_triage"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
