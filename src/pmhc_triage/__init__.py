@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from .afnd import FrequencyTable, load_afnd_frequencies
 from .antigen import resolve_entrez, variant_frequency
+from .burden import load_burden_table, manual_incidence
+from .score import PopulationScore, TargetScore, score_target
 from .hla import coverage_by_population, normalize_allele, parse_locus, population_coverage
 from .opentargets import (
     associated_targets,
@@ -42,5 +44,10 @@ __all__ = [
     "associated_targets",
     "variant_frequency",
     "resolve_entrez",
+    "manual_incidence",
+    "load_burden_table",
+    "score_target",
+    "TargetScore",
+    "PopulationScore",
     "__version__",
 ]
