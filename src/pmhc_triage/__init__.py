@@ -9,6 +9,7 @@ Public API is intentionally small and grows as modules land. Currently:
 from __future__ import annotations
 
 from .afnd import FrequencyTable, load_afnd_frequencies
+from .antigen import resolve_entrez, variant_frequency
 from .hla import coverage_by_population, normalize_allele, parse_locus, population_coverage
 from .opentargets import (
     associated_targets,
@@ -39,5 +40,7 @@ __all__ = [
     "resolve_disease",
     "tractability",
     "associated_targets",
+    "variant_frequency",
+    "resolve_entrez",
     "__version__",
 ]
