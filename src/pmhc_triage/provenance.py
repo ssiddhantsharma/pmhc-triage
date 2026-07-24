@@ -48,11 +48,17 @@ class Provenance:
 
 @dataclass
 class Sourced(Generic[T]):
-    """A value bound to its provenance. ``value is None`` means the datum is missing."""
+    """A value bound to its provenance. ``value is None`` means the datum is missing.
+
+    ``extra`` carries optional structured metadata about the value -- e.g. the
+    sample size ``n`` and confidence interval behind a fraction -- so a number from
+    n=23 is never silently trusted like one from n=1500.
+    """
 
     value: T | None
     provenance: Provenance
     warnings: list[str] = field(default_factory=list)
+    extra: dict[str, Any] = field(default_factory=dict)
 
     @property
     def is_missing(self) -> bool:
@@ -64,9 +70,12 @@ class Sourced(Generic[T]):
         return self
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        d = {
             "value": self.value,
             "missing": self.is_missing,
             "warnings": list(self.warnings),
             "provenance": self.provenance.to_dict(),
         }
+        if self.extra:
+            d["extra"] = dict(self.extra)
+        return d

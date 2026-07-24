@@ -41,12 +41,18 @@ class PopulationScore:
         def val(s):
             return None if s is None else s.value
 
+        af_extra = self.antigen_fraction.extra if self.antigen_fraction else {}
+        ci = None
+        if "ci95_low" in af_extra and "ci95_high" in af_extra:
+            ci = [af_extra["ci95_low"], af_extra["ci95_high"]]
         return {
             "population": self.population,
             "effective_n": self.effective_n,
             "computable": self.computable,
             "incidence": val(self.incidence),
             "antigen_fraction": val(self.antigen_fraction),
+            "antigen_n": af_extra.get("denominator"),
+            "antigen_fraction_ci95": ci,
             "hla_coverage": val(self.hla_coverage),
             "reasons": list(self.reasons),
         }

@@ -36,6 +36,9 @@ def test_g12d_fraction_matches_verified_counts():
     assert s.value == pytest.approx(49 / 179)
     assert "49/179" in s.provenance.method
     assert not s.is_missing
+    # sample size + CI carried so the fraction isn't trusted blind
+    assert s.extra["numerator"] == 49 and s.extra["denominator"] == 179
+    assert s.extra["ci95_low"] < 49 / 179 < s.extra["ci95_high"]
 
 
 def test_entrez_can_be_supplied_skipping_gene_lookup():

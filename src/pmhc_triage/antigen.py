@@ -22,6 +22,7 @@ from __future__ import annotations
 import httpx
 
 from .provenance import Provenance, Sourced, today_iso
+from .uncertainty import wilson_ci
 
 API = "https://www.cbioportal.org/api"
 _SOURCE = "cBioPortal REST"
@@ -124,6 +125,7 @@ def variant_frequency(
     numer = len(positive)
     fraction = round(numer / denom, 6)
 
+    ci_low, ci_high = wilson_ci(numer, denom)
     result = Sourced(
         fraction,
         prov(
@@ -131,6 +133,12 @@ def variant_frequency(
             f"(cBioPortal ODbL; profile {profile})"
         ),
     )
+    result.extra = {
+        "numerator": numer,
+        "denominator": denom,
+        "ci95_low": round(ci_low, 6),
+        "ci95_high": round(ci_high, 6),
+    }
     if numer == 0:
         result.warn(
             f"zero samples with {protein_change} in {gene} for {study_id} "
