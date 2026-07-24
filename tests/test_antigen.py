@@ -64,3 +64,52 @@ def test_unresolvable_gene_is_missing():
     s = variant_frequency(STUDY, "G12D", gene="NOTAGENE", client=_handler(gene_ok=False))
     assert s.is_missing
     assert any("Entrez" in w for w in s.warnings)
+
+
+def test_variant_frequency_multi_pools_studies_and_variants():
+    from pmhc_triage.antigen import variant_frequency_multi
+
+    def handler(request):
+        p = request.url.path
+        if "/genes/" in p:
+            return httpx.Response(200, json={"entrezGeneId": 3845})
+        if "/sample-lists/" in p:
+            n = 100 if "s1_" in p else 50
+            return httpx.Response(200, json={"sampleIds": [f"S{i}" for i in range(n)]})
+        if p.endswith("/mutations/fetch"):
+            # s1: 20 G12D; s2: 8 G12D + 2 G12V (both counted since we pool the two variants)
+            if "s1_" in p:
+                recs = [{"sampleId": f"A{i}", "proteinChange": "G12D"} for i in range(20)]
+            else:
+                recs = [{"sampleId": f"B{i}", "proteinChange": "G12D"} for i in range(8)]
+                recs += [{"sampleId": f"C{i}", "proteinChange": "G12V"} for i in range(2)]
+            return httpx.Response(200, json=recs)
+        return httpx.Response(404)
+
+    c = httpx.Client(transport=httpx.MockTransport(handler))
+    s = variant_frequency_multi(["s1", "s2"], ["G12D", "G12V"], client=c)
+    # pooled numerator (20 + 10) / denominator (100 + 50) = 30/150 = 0.2
+    assert s.value == pytest.approx(0.2)
+    assert s.extra["numerator"] == 30 and s.extra["denominator"] == 150
+    assert len(s.extra["per_study"]) == 2
+    assert sorted(s.extra["variants"]) == ["G12D", "G12V"]
+    assert any("pooled across studies" in w for w in s.warnings)
+
+
+def test_variant_frequency_multi_surfaces_skipped_study():
+    from pmhc_triage.antigen import variant_frequency_multi
+
+    def handler(request):
+        p = request.url.path
+        if "/genes/" in p:
+            return httpx.Response(200, json={"entrezGeneId": 3845})
+        if "/sample-lists/" in p:
+            if "bad_" in p:
+                return httpx.Response(404, text="no study")
+            return httpx.Response(200, json={"sampleIds": [f"S{i}" for i in range(100)]})
+        return httpx.Response(200, json=[{"sampleId": "A", "proteinChange": "G12D"}])
+
+    c = httpx.Client(transport=httpx.MockTransport(handler))
+    s = variant_frequency_multi(["good", "bad"], ["G12D"], client=c)
+    assert s.extra["denominator"] == 100  # only the good study
+    assert any("skipped bad" in w for w in s.warnings)

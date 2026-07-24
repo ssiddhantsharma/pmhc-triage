@@ -9,7 +9,7 @@ Public API is intentionally small and grows as modules land. Currently:
 from __future__ import annotations
 
 from .afnd import FrequencyTable, load_afnd_frequencies
-from .antigen import resolve_entrez, variant_frequency
+from .antigen import resolve_entrez, variant_frequency, variant_frequency_multi
 from .burden import bundled_diseases, load_bundled, load_burden_table, manual_incidence
 from .caching import cached_client
 from .score import PopulationScore, TargetScore, score_target
@@ -58,6 +58,7 @@ __all__ = [
     "tractability",
     "associated_targets",
     "variant_frequency",
+    "variant_frequency_multi",
     "resolve_entrez",
     "manual_incidence",
     "load_burden_table",

@@ -19,7 +19,13 @@ from typing import Any
 import httpx
 
 from .afnd import load_afnd_frequencies
-from .antigen import check_study, resolve_entrez, study_cancer_type, variant_frequency
+from .antigen import (
+    check_study,
+    resolve_entrez,
+    study_cancer_type,
+    variant_frequency,
+    variant_frequency_multi,
+)
 from .burden import load_burden_table, manual_incidence
 from .hla import coverage_by_population, normalize_allele
 from .identity import disease_matches, suggest_match
@@ -46,6 +52,8 @@ class TargetSpec:
     uniprot: str | None = None
     predict_alleles: bool = False
     presentation_threshold: float = 2.0
+    studies: list[str] | None = None   # pool antigen fraction across these (default [study])
+    variants: list[str] | None = None  # pool across these variants (default [variant])
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "TargetSpec":
@@ -63,6 +71,8 @@ class TargetSpec:
             uniprot=d.get("uniprot"),
             predict_alleles=bool(d.get("predict_alleles", False)),
             presentation_threshold=float(d.get("presentation_threshold", 2.0)),
+            studies=list(d["studies"]) if d.get("studies") else None,
+            variants=list(d["variants"]) if d.get("variants") else None,
         )
 
 
@@ -89,7 +99,12 @@ def _predicted_alleles(spec: "TargetSpec", freqs_by_pop: dict, client) -> Source
 
 def run_target(spec: TargetSpec, *, client: httpx.Client | None = None) -> TargetScore:
     """Fetch every factor and combine via the score gate. Missing factors surface, never fake."""
-    antigen = variant_frequency(spec.study, spec.variant, gene=spec.gene, client=client)
+    studies = spec.studies or [spec.study]
+    variants = spec.variants or [spec.variant]
+    if len(studies) > 1 or len(variants) > 1:
+        antigen = variant_frequency_multi(studies, variants, gene=spec.gene, client=client)
+    else:
+        antigen = variant_frequency(spec.study, spec.variant, gene=spec.gene, client=client)
 
     tract = None
     tid = resolve_target(spec.gene, client=client)

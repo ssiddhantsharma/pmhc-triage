@@ -36,6 +36,8 @@ def _spec_from_args(a: argparse.Namespace) -> TargetSpec:
         uniprot=a.uniprot,
         predict_alleles=getattr(a, "predict_alleles", False),
         presentation_threshold=getattr(a, "presentation_threshold", 2.0),
+        studies=_csv_list(a.studies) or None,
+        variants=_csv_list(a.variants) or None,
     )
 
 
@@ -61,6 +63,8 @@ def _add_score_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--variant", required=True, help="e.g. G12D")
     p.add_argument("--disease", required=True)
     p.add_argument("--study", required=True, help="cBioPortal study id")
+    p.add_argument("--studies", default="", help="comma-separated study ids to POOL antigen fraction over")
+    p.add_argument("--variants", default="", help="comma-separated variants to pool (e.g. 'G12D,G12V,G12C')")
     p.add_argument("--alleles", default="", help="comma-separated, e.g. 'A*11:01,A*03:01' (manual path)")
     p.add_argument("--predict-alleles", dest="predict_alleles", action="store_true",
                    help="predict presenting alleles via MHCflurry (needs --uniprot + [presentation] extra)")

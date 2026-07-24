@@ -88,6 +88,29 @@ def study_cancer_type(study_id: str, *, client: httpx.Client | None = None, time
     return Sourced(str(name), replace(prov, query_date=fa))
 
 
+def _counts(study_id, changes, entrez, sample_list, client, timeout):
+    """(numerator, denominator, fetched_at, error) for samples carrying ANY of ``changes``.
+
+    numerator = distinct sequenced samples with proteinChange in the set; denominator
+    = size of the sequenced sample list. Shared by single- and multi-study paths.
+    """
+    profile = f"{study_id}_mutations"
+    sl_data, err, _ = _request("GET", f"{API}/sample-lists/{sample_list}", client, timeout)
+    if err:
+        return 0, 0, None, err
+    denom = len((sl_data or {}).get("sampleIds", []))
+    if denom == 0:
+        return 0, 0, None, f"sample list {sample_list!r} is empty or missing (denominator 0)"
+    body = {"sampleListId": sample_list, "entrezGeneIds": [entrez]}
+    muts, err, fa = _request(
+        "POST", f"{API}/molecular-profiles/{profile}/mutations/fetch", client, timeout, json=body
+    )
+    if err:
+        return 0, denom, None, err
+    numer = len({m["sampleId"] for m in (muts or []) if m.get("proteinChange") in changes})
+    return numer, denom, fa, None
+
+
 def variant_frequency(
     study_id: str,
     protein_change: str,
@@ -121,25 +144,9 @@ def variant_frequency(
             )
         entrez = resolved.value
 
-    # denominator: number of sequenced samples
-    sl_data, err, _ = _request("GET", f"{API}/sample-lists/{sample_list}", client, timeout)
+    numer, denom, fa, err = _counts(study_id, {protein_change}, entrez, sample_list, client, timeout)
     if err:
         return Sourced(None, prov(context)).warn(err)
-    denom = len((sl_data or {}).get("sampleIds", []))
-    if denom == 0:
-        return Sourced(None, prov(context)).warn(
-            f"sample list {sample_list!r} is empty or missing (denominator 0)"
-        )
-
-    # numerator: distinct samples with the exact protein change
-    body = {"sampleListId": sample_list, "entrezGeneIds": [entrez]}
-    muts, err, fa = _request(
-        "POST", f"{API}/molecular-profiles/{profile}/mutations/fetch", client, timeout, json=body
-    )
-    if err:
-        return Sourced(None, prov(context)).warn(err)
-    positive = {m["sampleId"] for m in (muts or []) if m.get("proteinChange") == protein_change}
-    numer = len(positive)
     fraction = round(numer / denom, 6)
 
     ci_low, ci_high = wilson_ci(numer, denom)
@@ -164,4 +171,77 @@ def variant_frequency(
             f"zero samples with {protein_change} in {gene} for {study_id} "
             "(a real 0.0, not missing -- check the study/variant if unexpected)"
         )
+    return result
+
+
+def variant_frequency_multi(
+    studies,
+    protein_changes,
+    *,
+    gene: str = "KRAS",
+    entrez: int | None = None,
+    client: httpx.Client | None = None,
+    timeout: float = 30.0,
+) -> Sourced[float]:
+    """Pooled antigen-positive fraction across multiple studies and/or variants.
+
+    numerator = distinct samples carrying ANY of ``protein_changes``, pooled across
+    ``studies``; denominator = pooled sequenced samples. Per-study breakdown is in
+    ``extra["per_study"]``. Studies that error are **surfaced** (listed, skipped),
+    never silently dropped. Pooling assumes comparable cohorts -- flagged as a warning.
+    """
+    changes = set(protein_changes)
+    label = "/".join(sorted(changes))
+    studies = list(studies)
+
+    def prov(method):
+        return Provenance(source=_SOURCE, url=API, query_date=today_iso(), method=method)
+
+    context = f"{label} in {gene} pooled across {len(studies)} studies"
+    if entrez is None:
+        resolved = resolve_entrez(gene, client=client, timeout=timeout)
+        if resolved.is_missing:
+            return Sourced(None, prov(context)).warn(f"could not resolve Entrez id for {gene!r}")
+        entrez = resolved.value
+
+    per_study, skipped = [], []
+    total_n = total_d = 0
+    last_fa = None
+    for s in studies:
+        numer, denom, fa, err = _counts(s, changes, entrez, f"{s}_sequenced", client, timeout)
+        if err:
+            skipped.append(f"{s}: {err}")
+            continue
+        per_study.append({"study": s, "numerator": numer, "denominator": denom,
+                          "fraction": round(numer / denom, 6)})
+        total_n += numer
+        total_d += denom
+        last_fa = fa or last_fa
+
+    if total_d == 0:
+        r = Sourced(None, prov(context)).warn("no usable studies (all errored or empty)")
+        for sk in skipped:
+            r.warn(f"skipped {sk}")
+        return r
+
+    fraction = round(total_n / total_d, 6)
+    lo, hi = wilson_ci(total_n, total_d)
+    result = Sourced(
+        fraction,
+        replace(prov(f"{label}: {total_n}/{total_d} pooled across {len(per_study)} studies "
+                     "(cBioPortal ODbL)"), query_date=last_fa or today_iso()),
+    )
+    result.extra = {
+        "numerator": total_n,
+        "denominator": total_d,
+        "ci95_low": round(lo, 6),
+        "ci95_high": round(hi, 6),
+        "variants": sorted(changes),
+        "per_study": per_study,
+    }
+    result.warn("pooled across studies; assumes comparable cohorts (heterogeneity not modeled)")
+    for sk in skipped:
+        result.warn(f"skipped {sk}")
+    if total_n == 0:
+        result.warn(f"zero samples with {label} across studies (a real 0.0)")
     return result
