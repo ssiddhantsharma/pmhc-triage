@@ -89,11 +89,10 @@ def predict_presenting_alleles(
     Returns a surfaced *missing* result (never a crash) if MHCflurry is not
     installed or prediction fails. ``_predictor`` may be injected for testing.
 
-    NOTE: the MHCflurry call is written against its documented
-    ``Class1PresentationPredictor`` API but has not been live-verified in this
-    build (kept dependency-free by default); verify column names against your
-    installed MHCflurry version. The selection rule itself is tested via
-    :func:`select_presenting`.
+    Live-verified against MHCflurry 2.2.1: each panel allele is passed as its own
+    single-allele "sample" (``{allele: [allele]}``) so we get a per-allele
+    ``presentation_percentile`` (lower = stronger); an allele presents if its best
+    (minimum) percentile over the peptides is ``<= threshold_percentile``.
     """
     prov = Provenance(
         source="MHCflurry Class1PresentationPredictor",
@@ -117,11 +116,16 @@ def predict_presenting_alleles(
             return Sourced(None, prov).warn(f"could not load MHCflurry predictor: {exc}")
 
     try:
-        df = _predictor.predict(peptides=peptides, alleles=allele_panel)
+        # one allele per "sample" -> per-allele presentation_percentile
+        df = _predictor.predict(peptides=peptides, alleles={a: [a] for a in allele_panel})
     except Exception as exc:  # pragma: no cover - environment dependent
         return Sourced(None, prov).warn(f"MHCflurry prediction failed: {exc}")
 
-    # Normalize to (allele, percentile); MHCflurry uses 'affinity_percentile' (lower=better).
-    score_col = "affinity_percentile" if "affinity_percentile" in getattr(df, "columns", []) else "percentile"
-    alleles = select_presenting(df, score_col=score_col, threshold=threshold_percentile, lower_is_better=True)
+    alleles = select_presenting(
+        df,
+        allele_col="sample_name",
+        score_col="presentation_percentile",
+        threshold=threshold_percentile,
+        lower_is_better=True,
+    )
     return Sourced(alleles, prov)

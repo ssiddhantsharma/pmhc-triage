@@ -32,8 +32,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# mhcflurry pulls in tensorflow; keep it out of the core install.
-presentation = ["mhcflurry>=2.0"]
+# Optional automated presentation prediction. MHCflurry 2.2+ uses a torch backend
+# (not TensorFlow). After install run: `mhcflurry-downloads fetch models_class1_presentation`.
+presentation = ["mhcflurry>=2.2"]
 dev = ["pytest>=7", "ruff"]
 
 [project.scripts]

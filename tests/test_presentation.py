@@ -1,5 +1,9 @@
+import importlib.util
+
 import pandas as pd
 import pytest
+
+_HAS_MHCFLURRY = importlib.util.find_spec("mhcflurry") is not None
 
 from pmhc_triage.presentation import (
     manual_presenting_alleles,
@@ -61,12 +65,23 @@ def test_predict_without_mhcflurry_is_missing_not_crash():
 
 
 def test_predict_with_injected_predictor():
+    # matches the real MHCflurry shape: per-allele 'sample_name' + 'presentation_percentile'
     class FakePredictor:
         def predict(self, peptides, alleles):
             return pd.DataFrame([
-                {"allele": "A*11:01", "affinity_percentile": 0.3},
-                {"allele": "A*03:01", "affinity_percentile": 9.0},
+                {"sample_name": "A*11:01", "presentation_percentile": 0.3},
+                {"sample_name": "A*03:01", "presentation_percentile": 9.0},
             ])
 
     s = predict_presenting_alleles(["VVVGADGVGK"], ["A*11:01", "A*03:01"], _predictor=FakePredictor())
     assert s.value == ["A*11:01"]  # only the strong binder
+
+
+@pytest.mark.skipif(not _HAS_MHCFLURRY, reason="mhcflurry (optional extra) not installed")
+def test_live_mhcflurry_kras_g12d_restriction():
+    # Real end-to-end: KRAS G12D is A*11:01 / A*03:01 restricted, NOT A*02:01.
+    peps = ["VVVGADGVGK", "VVGADGVGK", "GADGVGKSA"]
+    s = predict_presenting_alleles(peps, ["A*11:01", "A*03:01", "A*02:01"], threshold_percentile=2.0)
+    assert not s.is_missing, s.warnings
+    assert "A*11:01" in s.value and "A*03:01" in s.value
+    assert "A*02:01" not in s.value  # weak binder -> real biology reproduced
