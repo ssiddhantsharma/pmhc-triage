@@ -73,6 +73,21 @@ def check_study(study_id: str, *, client: httpx.Client | None = None, timeout: f
     return Sourced(True, replace(prov, query_date=fa))
 
 
+def study_cancer_type(study_id: str, *, client: httpx.Client | None = None, timeout: float = 30.0) -> Sourced[str]:
+    """The cancer type a cBioPortal study represents (for study<->disease preflight)."""
+    url = f"{API}/studies/{study_id}"
+    prov = Provenance(source=_SOURCE, url=url, query_date=today_iso(),
+                      method="cBioPortal study cancerType")
+    data, err, fa = _request("GET", url, client, timeout)
+    if err:
+        return Sourced(None, prov).warn(err)
+    ct = (data or {}).get("cancerType") or {}
+    name = ct.get("name") or (data or {}).get("cancerTypeId")
+    if not name:
+        return Sourced(None, prov).warn(f"no cancerType for study {study_id!r}")
+    return Sourced(str(name), replace(prov, query_date=fa))
+
+
 def variant_frequency(
     study_id: str,
     protein_change: str,

@@ -19,10 +19,10 @@ from typing import Any
 import httpx
 
 from .afnd import load_afnd_frequencies
-from .antigen import check_study, resolve_entrez, variant_frequency
+from .antigen import check_study, resolve_entrez, study_cancer_type, variant_frequency
 from .burden import load_burden_table, manual_incidence
 from .hla import coverage_by_population, normalize_allele
-from .identity import suggest_match
+from .identity import disease_matches, suggest_match
 from .opentargets import resolve_target, tractability
 from .peptides import mutant_peptides, parse_substitution
 from .presentation import manual_presenting_alleles, predict_presenting_alleles
@@ -140,6 +140,13 @@ def preflight(spec: TargetSpec, *, client: httpx.Client | None = None) -> list[s
 
     if not check_study(spec.study, client=client).value:
         issues.append(f"study {spec.study!r} not found or has no sequenced samples")
+    else:
+        ct = study_cancer_type(spec.study, client=client)
+        if not ct.is_missing and not disease_matches(spec.disease, ct.value):
+            issues.append(
+                f"study {spec.study!r} is {ct.value!r} but --disease is {spec.disease!r} "
+                "-- study and disease may not correspond (wrong study for this neoantigen?)"
+            )
 
     if spec.freqs_path:
         ft = load_afnd_frequencies(spec.freqs_path)

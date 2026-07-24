@@ -2,8 +2,17 @@ from pmhc_triage.identity import (
     align_populations,
     canonical_disease,
     canonical_population,
+    disease_matches,
     suggest_match,
 )
+
+
+def test_disease_matches_organ_token():
+    assert disease_matches("PDAC", "Pancreatic Adenocarcinoma") is True
+    assert disease_matches("PDAC", "Invasive Breast Carcinoma") is False
+    assert disease_matches("colorectal carcinoma", "Colorectal Adenocarcinoma") is True
+    # can't tell (empty/generic) -> don't cry wolf
+    assert disease_matches("cancer", "Carcinoma") is True
 
 
 def test_canonical_population_synonyms():

@@ -15,6 +15,7 @@ rewrite the scoring path behind the user's back.
 
 from __future__ import annotations
 
+import re
 from typing import Iterable
 
 # Conservative: only obvious synonyms of the SAME label. No country->region merges.
@@ -67,6 +68,31 @@ def suggest_match(target: str, candidates: Iterable[str]) -> str | None:
         if canonical_population(cand) == ct and str(cand).strip() != str(target).strip():
             return cand
     return None
+
+
+# Generic oncology words dropped before comparing a disease label to a study's
+# cancer type -- so the comparison keys on the organ/lineage word (pancreatic, breast).
+_GENERIC_ONCOLOGY = {
+    "carcinoma", "cancer", "adenocarcinoma", "invasive", "tumor", "tumour",
+    "neoplasm", "malignant", "cell", "of", "the", "and", "a",
+}
+
+
+def _disease_tokens(text: str) -> set[str]:
+    return {w for w in re.split(r"[^a-z0-9]+", str(text).lower()) if w and w not in _GENERIC_ONCOLOGY}
+
+
+def disease_matches(disease: str, cancer_type: str) -> bool:
+    """True if a disease label and a study's cancer type plausibly refer to the same thing.
+
+    Compares organ/lineage tokens after dropping generic oncology words. If either
+    side has no informative token, returns True (can't tell -> don't cry wolf).
+    """
+    a = _disease_tokens(canonical_disease(disease))
+    b = _disease_tokens(cancer_type)
+    if not a or not b:
+        return True
+    return bool(a & b)
 
 
 def align_populations(a: Iterable[str], b: Iterable[str]) -> dict[str, list[str]]:

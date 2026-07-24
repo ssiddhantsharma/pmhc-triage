@@ -18,6 +18,7 @@ from .identity import (
     align_populations,
     canonical_disease,
     canonical_population,
+    disease_matches,
     suggest_match,
 )
 from .opentargets import (
@@ -75,6 +76,7 @@ __all__ = [
     "select_presenting",
     "canonical_population",
     "canonical_disease",
+    "disease_matches",
     "suggest_match",
     "align_populations",
     "cached_client",

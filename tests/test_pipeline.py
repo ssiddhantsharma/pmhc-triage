@@ -21,7 +21,7 @@ BURDEN = "disease,population,incidence\nPDAC,Europe,100000\nPDAC,EastAsia,150000
 KRAS_FASTA = ">sp|P01116|RASK_HUMAN\nMTEYKLVVVGAGGVGKSALTIQLIQ\n"
 
 
-def _routing_client(*, study_ok=True, g12d=49, n=179):
+def _routing_client(*, study_ok=True, g12d=49, n=179, cancer_type="Pancreatic Adenocarcinoma"):
     def handler(request):
         host, path = request.url.host, request.url.path
         if host == "rest.uniprot.org":
@@ -41,6 +41,8 @@ def _routing_client(*, study_ok=True, g12d=49, n=179):
                 if not study_ok:
                     return httpx.Response(404, text="no study")
                 return httpx.Response(200, json={"sampleIds": [f"S{i}" for i in range(n)]})
+            if "/studies/" in path:
+                return httpx.Response(200, json={"cancerType": {"name": cancer_type}})
             if path.endswith("/mutations/fetch"):
                 return httpx.Response(200, json=[{"sampleId": f"S{i}", "proteinChange": "G12D"} for i in range(g12d)])
         return httpx.Response(404, text=f"unrouted {host}{path}")
@@ -82,6 +84,19 @@ def test_preflight_catches_missing_population_in_freqs(tmp_path):
     spec = _spec(tmp_path, populations=["Europe", "Africa"])  # Africa not in freqs
     issues = preflight(spec, client=_routing_client())
     assert any("Africa" in i for i in issues)
+
+
+def test_preflight_catches_study_disease_mismatch(tmp_path):
+    # study reports a breast cancer type, but --disease is PDAC -> must flag
+    spec = _spec(tmp_path)
+    issues = preflight(spec, client=_routing_client(cancer_type="Invasive Breast Carcinoma"))
+    assert any("may not correspond" in i for i in issues)
+
+
+def test_preflight_ok_when_study_matches_disease(tmp_path):
+    spec = _spec(tmp_path, uniprot="P01116")
+    issues = preflight(spec, client=_routing_client(cancer_type="Pancreatic Adenocarcinoma"))
+    assert not any("correspond" in i for i in issues)
 
 
 def test_preflight_catches_wt_mismatch(tmp_path):
