@@ -43,8 +43,10 @@ def _print_summary(spec: TargetSpec, ts) -> None:
     print(f"\n{spec.gene} {spec.variant} / {spec.disease}")
     for row in ts.rows():
         if row["effective_n"] is not None:
+            ci = row.get("effective_n_ci95_antigen_only")
+            ci_str = f" [{ci[0]:,.0f}-{ci[1]:,.0f} antigen-CI]" if ci else ""
             print(
-                f"  {row['population']:12s} effective_N = {row['effective_n']:,.0f}  "
+                f"  {row['population']:12s} effective_N = {row['effective_n']:,.0f}{ci_str}  "
                 f"(incidence {row['incidence']:,.0f} x antigen {row['antigen_fraction']} "
                 f"x coverage {row['hla_coverage']})"
             )

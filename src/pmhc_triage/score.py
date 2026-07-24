@@ -32,6 +32,9 @@ class PopulationScore:
     antigen_fraction: Sourced[float]
     hla_coverage: Sourced[float] | None
     reasons: list[str] = field(default_factory=list)
+    # range from the antigen-fraction 95% CI ONLY (incidence + coverage uncertainty NOT modeled)
+    effective_n_low: float | None = None
+    effective_n_high: float | None = None
 
     @property
     def computable(self) -> bool:
@@ -48,6 +51,10 @@ class PopulationScore:
         return {
             "population": self.population,
             "effective_n": self.effective_n,
+            "effective_n_ci95_antigen_only": (
+                [self.effective_n_low, self.effective_n_high]
+                if self.effective_n_low is not None else None
+            ),
             "computable": self.computable,
             "incidence": val(self.incidence),
             "antigen_fraction": val(self.antigen_fraction),
@@ -137,10 +144,14 @@ def score_target(
         if cov is not None:
             provenance_log.append({"factor": "hla_coverage", "population": pop, **cov.to_dict()})
 
-        if reasons:
-            effective_n = None
-        else:
+        effective_n = eff_low = eff_high = None
+        if not reasons:
             effective_n = round(inc.value * antigen_fraction.value * cov.value, 2)
+            af_lo = antigen_fraction.extra.get("ci95_low")
+            af_hi = antigen_fraction.extra.get("ci95_high")
+            if af_lo is not None and af_hi is not None:
+                eff_low = round(inc.value * af_lo * cov.value, 2)
+                eff_high = round(inc.value * af_hi * cov.value, 2)
 
         per_population[pop] = PopulationScore(
             population=pop,
@@ -149,6 +160,15 @@ def score_target(
             antigen_fraction=antigen_fraction,
             hla_coverage=cov,
             reasons=reasons,
+            effective_n_low=eff_low,
+            effective_n_high=eff_high,
+        )
+
+    if any(ps.effective_n is not None for ps in per_population.values()):
+        warnings.append(
+            "effective_n_ci95_antigen_only reflects antigen-fraction sampling ONLY; "
+            "incidence and HLA-coverage uncertainty are NOT propagated, and the point "
+            "estimate assumes incidence/antigen/HLA are independent (see README caveats)"
         )
 
     if allele_source is not None:

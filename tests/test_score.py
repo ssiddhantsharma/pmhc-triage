@@ -64,6 +64,23 @@ def test_partial_missing_coverage_only_affects_that_population():
     assert any("coverage missing" in r for r in ts.per_population["EastAsia"].reasons)
 
 
+def test_effective_n_ci_propagated_from_antigen_and_disclosed():
+    af = Sourced(0.27, Provenance(source="cbio"))
+    af.extra = {"ci95_low": 0.21, "ci95_high": 0.34, "denominator": 179}
+    ts = score_target(
+        gene="KRAS", variant="G12D", disease="PDAC",
+        antigen_fraction=af,
+        incidence_by_population={"Europe": S(100000)},
+        coverage_by_population={"Europe": S(0.48)},
+    )
+    ps = ts.per_population["Europe"]
+    assert ps.effective_n_low == round(100000 * 0.21 * 0.48, 2)
+    assert ps.effective_n_high == round(100000 * 0.34 * 0.48, 2)
+    assert ps.effective_n_low < ps.effective_n < ps.effective_n_high
+    # honesty: the CI's antigen-only nature is disclosed
+    assert any("antigen-fraction sampling ONLY" in w for w in ts.warnings)
+
+
 def test_provenance_log_collects_every_factor():
     ts = score_target(
         gene="KRAS", variant="G12D", disease="PDAC",
