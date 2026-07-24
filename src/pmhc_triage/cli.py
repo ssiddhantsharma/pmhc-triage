@@ -11,6 +11,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from .caching import cached_client
 from .pipeline import TargetSpec, preflight, run_target
 from .report import write_provenance_json, write_results_csv
 
@@ -60,6 +61,7 @@ def _add_score_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--uniprot", help="UniProt accession (enables variant WT validation)")
     p.add_argument("--out", default="results.csv")
     p.add_argument("--provenance-out", dest="provenance_out", default=None)
+    p.add_argument("--cache", default=None, help="cache dir for reproducible/offline re-runs")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -80,6 +82,7 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--config", required=True)
     r.add_argument("--out", default="results.csv")
     r.add_argument("--provenance-out", dest="provenance_out", default=None)
+    r.add_argument("--cache", default=None, help="cache dir for reproducible/offline re-runs")
 
     return p
 
@@ -90,9 +93,18 @@ def _provenance_path(out: str, provided: str | None) -> Path:
     return Path(out).with_suffix(".provenance.json")
 
 
+def _client(a: argparse.Namespace):
+    return cached_client(a.cache) if getattr(a, "cache", None) else None
+
+
 def _cmd_score(a: argparse.Namespace) -> int:
     spec = _spec_from_args(a)
-    ts = run_target(spec)
+    client = _client(a)
+    try:
+        ts = run_target(spec, client=client)
+    finally:
+        if client is not None:
+            client.close()
     _print_summary(spec, ts)
     csv_path = write_results_csv([ts], a.out)
     prov_path = write_provenance_json([ts], _provenance_path(a.out, a.provenance_out))
@@ -102,7 +114,12 @@ def _cmd_score(a: argparse.Namespace) -> int:
 
 def _cmd_validate(a: argparse.Namespace) -> int:
     spec = _spec_from_args(a)
-    issues = preflight(spec)
+    client = _client(a)
+    try:
+        issues = preflight(spec, client=client)
+    finally:
+        if client is not None:
+            client.close()
     if not issues:
         print("preflight OK -- inputs join cleanly.")
         return 0
@@ -120,11 +137,16 @@ def _cmd_run(a: argparse.Namespace) -> int:
     if not specs:
         print("no targets in config", file=sys.stderr)
         return 2
+    client = _client(a)
     scores = []
-    for spec in specs:
-        ts = run_target(spec)
-        _print_summary(spec, ts)
-        scores.append(ts)
+    try:
+        for spec in specs:
+            ts = run_target(spec, client=client)
+            _print_summary(spec, ts)
+            scores.append(ts)
+    finally:
+        if client is not None:
+            client.close()
     csv_path = write_results_csv(scores, a.out)
     prov_path = write_provenance_json(scores, _provenance_path(a.out, a.provenance_out))
     print(f"\nwrote {csv_path} and {prov_path}")
