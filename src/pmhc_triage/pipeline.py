@@ -24,8 +24,9 @@ from .burden import load_burden_table, manual_incidence
 from .hla import coverage_by_population, normalize_allele
 from .identity import suggest_match
 from .opentargets import resolve_target, tractability
-from .peptides import parse_substitution
-from .presentation import manual_presenting_alleles
+from .peptides import mutant_peptides, parse_substitution
+from .presentation import manual_presenting_alleles, predict_presenting_alleles
+from .provenance import Provenance, Sourced
 from .score import TargetScore, score_target
 from .sequences import fetch_uniprot_sequence
 
@@ -43,6 +44,8 @@ class TargetSpec:
     burden_manual: dict[str, float] | None = None
     burden_source: str | None = None
     uniprot: str | None = None
+    predict_alleles: bool = False
+    presentation_threshold: float = 2.0
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "TargetSpec":
@@ -51,14 +54,37 @@ class TargetSpec:
             variant=d["variant"],
             disease=d["disease"],
             study=d["study"],
-            alleles=list(d["alleles"]),
+            alleles=list(d.get("alleles", [])),
             populations=list(d["populations"]),
             freqs_path=d.get("freqs"),
             burden_path=d.get("burden") if isinstance(d.get("burden"), str) else None,
             burden_manual=d.get("burden") if isinstance(d.get("burden"), dict) else None,
             burden_source=d.get("burden_source"),
             uniprot=d.get("uniprot"),
+            predict_alleles=bool(d.get("predict_alleles", False)),
+            presentation_threshold=float(d.get("presentation_threshold", 2.0)),
         )
+
+
+def _predicted_alleles(spec: "TargetSpec", freqs_by_pop: dict, client) -> Sourced:
+    """Predict presenting alleles via MHCflurry: UniProt seq -> peptides -> predict over
+    the frequency file's allele panel. Any failure surfaces (missing), never fabricates."""
+    if not spec.uniprot:
+        return Sourced(None, Provenance(source="allele prediction")).warn(
+            "predict_alleles requires a uniprot accession"
+        )
+    seq = fetch_uniprot_sequence(spec.uniprot, client=client)
+    if seq.is_missing:
+        return Sourced(None, seq.provenance).warn("UniProt fetch failed; cannot predict alleles")
+    peps = mutant_peptides(seq.value, spec.variant)
+    if peps.is_missing:
+        return Sourced(None, peps.provenance, warnings=list(peps.warnings))
+    panel = sorted({a for pop in freqs_by_pop.values() for a in pop})
+    if not panel:
+        return Sourced(None, Provenance(source="allele prediction")).warn(
+            "no alleles in frequency file to predict over"
+        )
+    return predict_presenting_alleles(peps.value, panel, threshold_percentile=spec.presentation_threshold)
 
 
 def run_target(spec: TargetSpec, *, client: httpx.Client | None = None) -> TargetScore:
@@ -70,14 +96,17 @@ def run_target(spec: TargetSpec, *, client: httpx.Client | None = None) -> Targe
     if not tid.is_missing:
         tract = tractability(tid.value, client=client)
 
-    alleles = manual_presenting_alleles(spec.alleles)
-    allele_list = alleles.value or []
-
     if spec.freqs_path:
         ft = load_afnd_frequencies(spec.freqs_path)
         freqs_by_pop = {p: ft.get(p) for p in spec.populations}
     else:
         freqs_by_pop = {p: {} for p in spec.populations}
+
+    if spec.predict_alleles:
+        alleles = _predicted_alleles(spec, freqs_by_pop, client)
+    else:
+        alleles = manual_presenting_alleles(spec.alleles)
+    allele_list = alleles.value or []
     coverage = coverage_by_population(allele_list, freqs_by_pop)
 
     incidence: dict = {}

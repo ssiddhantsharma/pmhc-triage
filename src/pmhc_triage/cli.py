@@ -34,6 +34,8 @@ def _spec_from_args(a: argparse.Namespace) -> TargetSpec:
         freqs_path=a.freqs,
         burden_path=a.burden,
         uniprot=a.uniprot,
+        predict_alleles=getattr(a, "predict_alleles", False),
+        presentation_threshold=getattr(a, "presentation_threshold", 2.0),
     )
 
 
@@ -57,7 +59,11 @@ def _add_score_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--variant", required=True, help="e.g. G12D")
     p.add_argument("--disease", required=True)
     p.add_argument("--study", required=True, help="cBioPortal study id")
-    p.add_argument("--alleles", required=True, help="comma-separated, e.g. 'A*11:01,A*03:01'")
+    p.add_argument("--alleles", default="", help="comma-separated, e.g. 'A*11:01,A*03:01' (manual path)")
+    p.add_argument("--predict-alleles", dest="predict_alleles", action="store_true",
+                   help="predict presenting alleles via MHCflurry (needs --uniprot + [presentation] extra)")
+    p.add_argument("--presentation-threshold", dest="presentation_threshold", type=float, default=2.0,
+                   help="MHCflurry presentation percentile threshold (default 2.0)")
     p.add_argument("--populations", required=True, help="comma-separated")
     p.add_argument("--freqs", help="AFND-format frequency file")
     p.add_argument("--burden", help="burden CSV (disease,population,incidence)")

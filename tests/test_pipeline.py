@@ -90,6 +90,29 @@ def test_preflight_catches_wt_mismatch(tmp_path):
     assert any("WT mismatch" in i for i in issues)
 
 
+def test_predict_alleles_mode_uses_predicted_not_manual(tmp_path, monkeypatch):
+    # predict_alleles=True: pipeline should fetch seq -> peptides -> predict, and use THAT
+    import pmhc_triage.pipeline as pl
+    from pmhc_triage.provenance import Provenance, Sourced
+
+    captured = {}
+
+    def fake_predict(peptides, panel, *, threshold_percentile=2.0):
+        captured["panel"] = panel
+        return Sourced(["A*11:01"], Provenance(source="MHCflurry (fake)"))
+
+    monkeypatch.setattr(pl, "predict_presenting_alleles", fake_predict)
+    spec = _spec(tmp_path, alleles=[], uniprot="P01116", predict_alleles=True)
+    ts = run_target(spec, client=_routing_client())
+    # coverage computed from the PREDICTED allele A*11:01 (present in both pops)
+    assert ts.per_population["Europe"].computable
+    # the panel handed to the predictor came from the freq file
+    assert "A*11:01" in captured["panel"] and "A*03:01" in captured["panel"]
+    # provenance records the predicted allele source
+    assert any(e["factor"] == "presenting_alleles" and "MHCflurry" in e["provenance"]["source"]
+               for e in ts.provenance_log)
+
+
 def test_preflight_suggests_population_alias(tmp_path):
     # freqs file uses "Europe"; request "European" -> preflight should suggest the alias
     spec = _spec(tmp_path, populations=["European"])
