@@ -9,7 +9,9 @@ Public API is intentionally small and grows as modules land. Currently:
 from __future__ import annotations
 
 from .hla import coverage_by_population, normalize_allele, parse_locus, population_coverage
+from .peptides import mutant_peptides, parse_substitution
 from .provenance import Provenance, Sourced, today_iso
+from .sequences import fetch_uniprot_sequence
 
 __version__ = "0.0.1"
 
@@ -21,5 +23,8 @@ __all__ = [
     "coverage_by_population",
     "parse_locus",
     "normalize_allele",
+    "fetch_uniprot_sequence",
+    "mutant_peptides",
+    "parse_substitution",
     "__version__",
 ]
