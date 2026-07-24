@@ -36,6 +36,17 @@ def test_bundled_case_insensitive():
     assert load_bundled("Lung Cancer").value == 2480000.0
 
 
+def test_bundled_surfaces_world_and_note_caveats():
+    s = load_bundled("pancreatic cancer")
+    assert any("World-level" in w for w in s.warnings)      # can't join per-region silently
+    assert any("bundle note" in w for w in s.warnings)      # PDAC~90% caveat visible at runtime
+
+
+def test_bundled_approximate_figures_flagged():
+    s = load_bundled("colorectal carcinoma")
+    assert any("approximate" in w.lower() for w in s.warnings)
+
+
 def test_bundled_unknown_is_missing_and_lists_options():
     s = load_bundled("made up disease")
     assert s.is_missing

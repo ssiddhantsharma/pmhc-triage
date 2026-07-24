@@ -48,11 +48,19 @@ def load_bundled(disease: str, *, population: str = "World") -> Sourced[float]:
             f"{disease!r}/{population!r} not in bundle; available: {bundled_diseases()}"
         )
     row = hits.iloc[0]
-    return Sourced(
+    result = Sourced(
         float(row["incidence"]),
         Provenance(source=str(row["source"]), query_date=today_iso(),
                    method=f"curated GLOBOCAN-2022 bundle: {row['note']}"),
     )
+    # Surface the bundle's caveats at RUNTIME, not just in the CSV file.
+    result.warn(f"bundle note: {row['note']}")
+    if str(row["population"]).strip().lower() == "world":
+        result.warn(
+            "World-level incidence: joins only with a 'World' HLA-coverage population. "
+            "For population-specific effective-N, supply per-region incidence instead."
+        )
+    return result
 
 
 def manual_incidence(
