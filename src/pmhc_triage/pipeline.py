@@ -24,6 +24,7 @@ from .burden import load_burden_table, manual_incidence
 from .hla import coverage_by_population, normalize_allele
 from .opentargets import resolve_target, tractability
 from .peptides import parse_substitution
+from .presentation import manual_presenting_alleles
 from .score import TargetScore, score_target
 from .sequences import fetch_uniprot_sequence
 
@@ -68,12 +69,15 @@ def run_target(spec: TargetSpec, *, client: httpx.Client | None = None) -> Targe
     if not tid.is_missing:
         tract = tractability(tid.value, client=client)
 
+    alleles = manual_presenting_alleles(spec.alleles)
+    allele_list = alleles.value or []
+
     if spec.freqs_path:
         ft = load_afnd_frequencies(spec.freqs_path)
         freqs_by_pop = {p: ft.get(p) for p in spec.populations}
     else:
         freqs_by_pop = {p: {} for p in spec.populations}
-    coverage = coverage_by_population(spec.alleles, freqs_by_pop)
+    coverage = coverage_by_population(allele_list, freqs_by_pop)
 
     incidence: dict = {}
     if spec.burden_path:
@@ -93,6 +97,7 @@ def run_target(spec: TargetSpec, *, client: httpx.Client | None = None) -> Targe
         incidence_by_population=incidence,
         coverage_by_population=coverage,
         tractability_context=tract,
+        allele_source=alleles,
     )
 
 

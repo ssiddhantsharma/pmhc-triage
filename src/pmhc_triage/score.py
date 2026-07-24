@@ -92,6 +92,7 @@ def score_target(
     incidence_by_population: Mapping[str, Sourced[float]],
     coverage_by_population: Mapping[str, Sourced[float]],
     tractability_context: Sourced[list] | None = None,
+    allele_source: Sourced[list] | None = None,
 ) -> TargetScore:
     """Combine factors into per-population effective-N, enforcing the join guard.
 
@@ -150,6 +151,8 @@ def score_target(
             reasons=reasons,
         )
 
+    if allele_source is not None:
+        provenance_log.append({"factor": "presenting_alleles", **allele_source.to_dict()})
     if tractability_context is not None:
         provenance_log.append({"factor": "tractability_context", **tractability_context.to_dict()})
 

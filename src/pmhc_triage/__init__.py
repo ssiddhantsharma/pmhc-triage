@@ -21,6 +21,11 @@ from .opentargets import (
 )
 from .peptides import mutant_peptides, parse_substitution
 from .pipeline import TargetSpec, preflight, run_target
+from .presentation import (
+    manual_presenting_alleles,
+    predict_presenting_alleles,
+    select_presenting,
+)
 from .provenance import Provenance, Sourced, today_iso
 from .report import write_provenance_json, write_results_csv
 from .sequences import fetch_uniprot_sequence
@@ -56,5 +61,8 @@ __all__ = [
     "preflight",
     "write_results_csv",
     "write_provenance_json",
+    "manual_presenting_alleles",
+    "predict_presenting_alleles",
+    "select_presenting",
     "__version__",
 ]
