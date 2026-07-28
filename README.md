@@ -7,7 +7,7 @@
 
 ## Why
 
-Target-prioritization tools (Open Targets, etc.) are HLA-blind. But a pMHC-directed therapy — a TCR-T, a TCR-mimic antibody, a bispecific — only works if the patient's HLA can present the target peptide. A binder against *peptide-X on HLA-A\*02:01* is useless in an A\*02:01-negative patient. So **raw disease incidence overstates who a pMHC target can reach**, and by an amount that varies wildly across populations (A\*02:01 is common in Europe, A\*11:01 in East Asia).
+Target-prioritization tools (Open Targets, etc.) are HLA-blind. But a pMHC-directed therapy — a TCR-T, a TCR-mimic antibody, a bispecific only works if the patient's HLA can present the target peptide. A binder against *peptide-X on HLA-A\*02:01* is useless in an A\*02:01-negative patient. So **raw disease incidence overstates who a pMHC target can reach**, and by an amount that varies wildly across populations (A\*02:01 is common in Europe, A\*11:01 in East Asia).
 
 `pmhc-triage` corrects for this:
 
@@ -17,7 +17,7 @@ effective addressable N = disease incidence
                         × HLA population coverage (of the alleles presenting the peptide)
 ```
 
-Every value carries its source, URL, query date, and method — because a sourced, reproducible number is exactly what a language model will otherwise invent.
+Every value carries its source, URL, query date, and method because a sourced, reproducible number is exactly what a language model will otherwise invent.
 
 ## Install
 
@@ -32,7 +32,7 @@ pip install -e ".[presentation]"        # optional: MHCflurry allele prediction
 # 1) fetch allele frequencies from AFND (license-clean, on your machine)
 pmhc-triage fetch-freqs --out freqs.tsv
 
-# 2) score a target — incidence auto-filled from the shipped cited bundle
+# 2) score a target incidence auto-filled from the shipped cited bundle
 pmhc-triage score --gene KRAS --variant G12D --disease "pancreatic cancer" \
   --study paad_tcga_pan_can_atlas_2018 --alleles "A*03:01,A*11:01" \
   --populations Europe,EastAsia,SouthAsia --freqs freqs.tsv
