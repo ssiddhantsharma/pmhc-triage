@@ -46,7 +46,7 @@ pmhc-triage score --gene KRAS --variant G12D --disease "pancreatic cancer" \
 
 ## Does the number hold up?
 
-See [`validation/`](validation/) for the evidence, honestly reported: the tool recovers known KRAS G12D restriction (A\*03:01/A\*11:01) from sequence; HLA-adjustment reorders targets across restriction families and populations but is a flat multiplier within a shared HLA superfamily; the multiplicative model's independence bias is bounded from Marty et al. 2017. It is **not** validated against a ground-truth addressable population — none exists — so treat outputs as *sourced, reproducible estimates*, not measured truth.
+See [`validation/`](validation/) for the evidence, honestly reported: the tool recovers known KRAS G12D restriction (A\*03:01/A\*11:01) from sequence; HLA-adjustment reorders targets across restriction families and populations but is a flat multiplier within a shared HLA superfamily; the multiplicative model's independence bias is bounded from Marty et al. 2017. It is **not** validated against a ground-truth addressable population, so treat outputs as *sourced, reproducible estimates*, not measured truth.
 
 ## Data & license
 
