@@ -22,3 +22,6 @@ htmlcov/
 .DS_Store
 .vscode/
 .idea/
+
+# Raw AFND frequency export (CC BY-NC) — NOT redistributed; regenerate with `pmhc-triage fetch-freqs`
+validation/kras_freqs_nmdp.tsv

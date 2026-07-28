@@ -13,7 +13,7 @@ confident-looking but meaningless number.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import httpx
@@ -27,9 +27,10 @@ from .antigen import (
     variant_frequency,
     variant_frequency_multi,
 )
-from .burden import load_burden_table, manual_incidence
+from .burden import load_bundled, load_burden_table, manual_incidence
 from .hla import coverage_by_population, normalize_allele
 from .identity import disease_matches, suggest_match
+from .montecarlo import MCResult, effective_n_interval
 from .opentargets import resolve_target, tractability
 from .peptides import mutant_peptides, parse_substitution
 from .presentation import manual_presenting_alleles, predict_presenting_alleles
@@ -57,6 +58,10 @@ class TargetSpec:
     variants: list[str] | None = None  # pool across these variants (default [variant])
     antigen_mode: str = "mutation"     # "mutation" (cBioPortal variant) or "expression" (RNA-seq)
     expression_threshold: float = 1.0  # z-score cutoff for expression mode
+    mc: bool = True                    # Monte-Carlo interval on effective_N (antigen+coverage)
+    mc_draws: int = 20000              # MC draws
+    mc_seed: int = 0                   # MC seed (reproducible intervals)
+    incidence_rel_sd: float | None = None  # optional USER-owned incidence relative SD
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "TargetSpec":
@@ -78,6 +83,12 @@ class TargetSpec:
             variants=list(d["variants"]) if d.get("variants") else None,
             antigen_mode=d.get("antigen_mode", "mutation"),
             expression_threshold=float(d.get("expression_threshold", 1.0)),
+            mc=bool(d.get("mc", True)),
+            mc_draws=int(d.get("mc_draws", 20000)),
+            mc_seed=int(d.get("mc_seed", 0)),
+            incidence_rel_sd=(
+                float(d["incidence_rel_sd"]) if d.get("incidence_rel_sd") is not None else None
+            ),
         )
 
 
@@ -124,8 +135,10 @@ def run_target(spec: TargetSpec, *, client: httpx.Client | None = None) -> Targe
     if spec.freqs_path:
         ft = load_afnd_frequencies(spec.freqs_path)
         freqs_by_pop = {p: ft.get(p) for p in spec.populations}
+        sizes_by_pop = {p: ft.get_sample_sizes(p) for p in spec.populations}
     else:
         freqs_by_pop = {p: {} for p in spec.populations}
+        sizes_by_pop = {p: {} for p in spec.populations}
 
     if spec.predict_alleles:
         alleles = _predicted_alleles(spec, freqs_by_pop, client)
@@ -143,6 +156,16 @@ def run_target(spec: TargetSpec, *, client: httpx.Client | None = None) -> Targe
             incidence[pop] = manual_incidence(
                 spec.disease, pop, cases, source=spec.burden_source or "inline config value"
             )
+    else:
+        # No user burden supplied -> fall back to the shipped cited starter bundle
+        # (World + per-region country-proxy figures). Missing disease/population simply
+        # doesn't populate that key, and the score gate surfaces it as missing (never 0).
+        for pop in spec.populations:
+            s = load_bundled(spec.disease, population=pop)
+            if not s.is_missing:
+                incidence[pop] = s
+
+    mc_by_pop = _monte_carlo(spec, antigen, incidence, coverage, allele_list, freqs_by_pop, sizes_by_pop)
 
     return score_target(
         gene=spec.gene,
@@ -153,7 +176,41 @@ def run_target(spec: TargetSpec, *, client: httpx.Client | None = None) -> Targe
         coverage_by_population=coverage,
         tractability_context=tract,
         allele_source=alleles,
+        mc_by_population=mc_by_pop,
     )
+
+
+def _monte_carlo(spec, antigen, incidence, coverage, allele_list, freqs_by_pop, sizes_by_pop):
+    """Per-population Monte-Carlo interval, only where all factors are present.
+
+    Runs only for populations whose incidence, coverage, and antigen fraction are all
+    non-missing (the same gate the score step uses to emit a point estimate) and where
+    the antigen fraction carries numerator/denominator. Never fabricates an interval.
+    """
+    if not spec.mc or antigen.is_missing:
+        return {}
+    numer = antigen.extra.get("numerator")
+    denom = antigen.extra.get("denominator")
+    if numer is None or not denom:
+        return {}
+    out: dict[str, MCResult] = {}
+    for pop in spec.populations:
+        inc = incidence.get(pop)
+        cov = coverage.get(pop)
+        if inc is None or inc.is_missing or cov is None or cov.is_missing:
+            continue
+        out[pop] = effective_n_interval(
+            incidence=inc.value,
+            antigen_numerator=int(numer),
+            antigen_denominator=int(denom),
+            covering_alleles=allele_list,
+            allele_freqs=freqs_by_pop.get(pop, {}),
+            sample_sizes=sizes_by_pop.get(pop, {}),
+            n_draws=spec.mc_draws,
+            seed=spec.mc_seed,
+            incidence_rel_sd=spec.incidence_rel_sd,
+        )
+    return out
 
 
 def preflight(spec: TargetSpec, *, client: httpx.Client | None = None) -> list[str]:

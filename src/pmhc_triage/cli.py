@@ -8,10 +8,9 @@ validate is the fail-fast preflight -- it checks joins and exits non-zero on iss
 from __future__ import annotations
 
 import argparse
+import csv
 import sys
 from pathlib import Path
-
-import csv
 
 from .caching import cached_client
 from .opentargets import associated_targets, resolve_disease
@@ -91,7 +90,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="HLA-coverage-adjusted effective addressable-population "
         "estimates for pMHC / T-cell immunotherapy targets.",
     )
-    sub = p.add_subparsers(dest="command", metavar="{score,discover,validate,run}")
+    sub = p.add_subparsers(dest="command", metavar="{score,discover,validate,run,fetch-freqs}")
 
     s = sub.add_parser("score", help="score one target from flags")
     _add_score_args(s)
@@ -110,6 +109,15 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--out", default="results.csv")
     r.add_argument("--provenance-out", dest="provenance_out", default=None)
     r.add_argument("--cache", default=None, help="cache dir for reproducible/offline re-runs")
+
+    ff = sub.add_parser(
+        "fetch-freqs",
+        help="fetch AFND allele frequencies to a local --freqs file (NOT bundled; "
+        "your data-use with AFND under its CC BY-NC terms)",
+    )
+    ff.add_argument("--alleles", default="",
+                    help="comma-separated alleles (default: a common class-I panel)")
+    ff.add_argument("--out", default="freqs.tsv")
 
     return p
 
@@ -182,6 +190,24 @@ def _cmd_discover(a: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_fetch_freqs(a: argparse.Namespace) -> int:
+    from .fetch import COMMON_CLASS_I, DEFAULT_POPULATIONS, fetch_frequencies
+
+    alleles = _csv_list(a.alleles) or list(COMMON_CLASS_I)
+    pops = DEFAULT_POPULATIONS
+    print(f"fetching {len(alleles)} alleles x {len(pops)} cohorts from AFND "
+          "(your data-use under AFND CC BY-NC; not redistributed)...")
+    result = fetch_frequencies(alleles, pops)
+    n = result.write_tsv(a.out)
+    print(f"wrote {n} (allele,population) rows -> {a.out}  [cohorts: "
+          + ", ".join(f"{p.label}={p.afnd_population}" for p in pops) + "]")
+    if result.warnings:
+        print(f"{len(result.warnings)} surfaced (not written as 0):")
+        for w in result.warnings[:12]:
+            print(f"  ! {w}")
+    return 0
+
+
 def _cmd_run(a: argparse.Namespace) -> int:
     import yaml
 
@@ -216,6 +242,7 @@ def main(argv: list[str] | None = None) -> int:
         "validate": _cmd_validate,
         "discover": _cmd_discover,
         "run": _cmd_run,
+        "fetch-freqs": _cmd_fetch_freqs,
     }
     return handlers[args.command](args)
 

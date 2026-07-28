@@ -32,11 +32,13 @@ def bundled_diseases() -> list[str]:
 
 
 def load_bundled(disease: str, *, population: str = "World") -> Sourced[float]:
-    """Incidence from the shipped curated bundle (World-level, cited).
+    """Incidence from the shipped curated starter bundle (cited).
 
-    These are convenience starter values (GLOBOCAN 2022) with the citation carried
-    in the provenance; refine per-region for a real analysis. Returns a surfaced
-    *missing* if the disease/population isn't in the bundle.
+    Convenience starter values (GCO Cancer Today 2024) with the citation carried in the
+    provenance. Covers ``World`` plus per-region rows (``Europe``/``EastAsia``/``SouthAsia``,
+    populated from Germany/China/India country figures as regional proxies — surfaced in
+    the note). Refine per-region for a real analysis. Returns a surfaced *missing* if the
+    disease/population isn't in the bundle.
     """
     df = _bundle_df()
     prov = Provenance(source="pmhc-triage curated bundle", query_date=today_iso(),

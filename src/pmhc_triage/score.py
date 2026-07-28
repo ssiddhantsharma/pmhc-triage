@@ -19,6 +19,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Mapping
 
+from .montecarlo import MCResult
 from .provenance import Sourced
 
 
@@ -35,6 +36,8 @@ class PopulationScore:
     # range from the antigen-fraction 95% CI ONLY (incidence + coverage uncertainty NOT modeled)
     effective_n_low: float | None = None
     effective_n_high: float | None = None
+    # full Monte-Carlo interval (antigen + coverage sampling; incidence per its own rule)
+    mc: MCResult | None = None
 
     @property
     def computable(self) -> bool:
@@ -48,7 +51,7 @@ class PopulationScore:
         ci = None
         if "ci95_low" in af_extra and "ci95_high" in af_extra:
             ci = [af_extra["ci95_low"], af_extra["ci95_high"]]
-        return {
+        d = {
             "population": self.population,
             "effective_n": self.effective_n,
             "effective_n_ci95_antigen_only": (
@@ -63,6 +66,9 @@ class PopulationScore:
             "hla_coverage": val(self.hla_coverage),
             "reasons": list(self.reasons),
         }
+        if self.mc is not None:
+            d.update(self.mc.to_dict())
+        return d
 
 
 @dataclass
@@ -100,6 +106,7 @@ def score_target(
     coverage_by_population: Mapping[str, Sourced[float]],
     tractability_context: Sourced[list] | None = None,
     allele_source: Sourced[list] | None = None,
+    mc_by_population: Mapping[str, MCResult] | None = None,
 ) -> TargetScore:
     """Combine factors into per-population effective-N, enforcing the join guard.
 
@@ -162,13 +169,20 @@ def score_target(
             reasons=reasons,
             effective_n_low=eff_low,
             effective_n_high=eff_high,
+            mc=(mc_by_population or {}).get(pop),
         )
 
     if any(ps.effective_n is not None for ps in per_population.values()):
+        has_mc = any(ps.mc is not None and ps.mc.computable for ps in per_population.values())
+        fuller = (
+            " A fuller Monte-Carlo interval (effective_n_mc_ci95) propagating antigen + "
+            "HLA-coverage sampling is also reported."
+            if has_mc else ""
+        )
         warnings.append(
             "effective_n_ci95_antigen_only reflects antigen-fraction sampling ONLY; "
-            "incidence and HLA-coverage uncertainty are NOT propagated, and the point "
-            "estimate assumes incidence/antigen/HLA are independent (see README caveats)"
+            "incidence and HLA-coverage uncertainty are NOT propagated there, and the point "
+            "estimate assumes incidence/antigen/HLA are independent (see README caveats)." + fuller
         )
 
     if allele_source is not None:

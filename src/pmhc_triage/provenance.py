@@ -22,7 +22,7 @@ Two types:
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from datetime import date, timezone, datetime
+from datetime import datetime, timezone
 from typing import Any, Generic, TypeVar
 
 T = TypeVar("T")

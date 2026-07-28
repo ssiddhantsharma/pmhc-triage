@@ -75,3 +75,32 @@ def test_integration_with_coverage(tmp_path):
     # Europe freq 0.28 -> 1-(0.72)^2 = 0.4816 ; EastAsia 0.10 -> 1-(0.9)^2 = 0.19
     assert cov["Europe"].value == pytest.approx(0.4816)
     assert cov["EastAsia"].value == pytest.approx(0.19)
+
+
+# --- optional sample-size column (feeds the Monte-Carlo coverage CI) --------
+
+SYNTH_TSV_N = (
+    "allele\tpopulation\tallele_frequency\tsample_size\n"
+    "A*02:01\tEurope\t0.28\t1000\n"
+    "A*01:01\tEurope\t0.16\t1000\n"
+)
+
+
+def test_sample_size_parsed_when_present(tmp_path):
+    ft = load_afnd_frequencies(_write(tmp_path, SYNTH_TSV_N))
+    assert ft.get_sample_sizes("Europe")["A*02:01"] == 1000
+    assert not ft.warnings
+
+
+def test_sample_size_absent_is_empty_not_error(tmp_path):
+    # default column name asked for, but the file doesn't have it -> silently skipped
+    ft = load_afnd_frequencies(_write(tmp_path, SYNTH_TSV))
+    assert ft.sample_sizes == {}
+    assert not any("sample" in w.lower() for w in ft.warnings)
+
+
+def test_sample_size_nonpositive_warns(tmp_path):
+    txt = "allele\tpopulation\tallele_frequency\tsample_size\nA*02:01\tX\t0.2\t0\n"
+    ft = load_afnd_frequencies(_write(tmp_path, txt))
+    assert ft.get_sample_sizes("X") == {}
+    assert any("non-positive sample size" in w for w in ft.warnings)

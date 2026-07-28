@@ -77,6 +77,33 @@ def select_presenting(
     return sorted(keep)
 
 
+def sweep_presenting_alleles(
+    df,
+    thresholds,
+    *,
+    allele_col: str = "sample_name",
+    score_col: str = "presentation_percentile",
+    lower_is_better: bool = True,
+) -> dict[float, list[str]]:
+    """Presenting-allele set at each threshold -- makes the threshold dependence visible.
+
+    The presentation threshold is a lever, not a fact: a looser cutoff admits more
+    alleles and inflates HLA coverage. Rather than commit to one arbitrary point, sweep
+    it. ``df`` is a scored (peptide, allele) table (e.g. MHCflurry output); returns
+    ``{threshold: [alleles]}``. Pure -- no MHCflurry needed to test the selection rule.
+    """
+    return {
+        float(t): select_presenting(
+            df,
+            allele_col=allele_col,
+            score_col=score_col,
+            threshold=t,
+            lower_is_better=lower_is_better,
+        )
+        for t in thresholds
+    }
+
+
 def predict_presenting_alleles(
     peptides: Iterable[str],
     allele_panel: Iterable[str],

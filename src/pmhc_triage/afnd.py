@@ -30,17 +30,26 @@ class FrequencyTable:
 
     ``by_population`` maps population name -> {normalized allele: frequency}. Feed
     a single population's dict straight into :func:`pmhc_triage.hla.population_coverage`.
+
+    ``sample_sizes`` maps population -> {normalized allele: n_individuals}, populated
+    only when a sample-size column was supplied. It feeds the Monte-Carlo coverage CI
+    (chromosomes = 2 x individuals); an empty dict means coverage uncertainty can't be
+    propagated for that population (surfaced, never assumed).
     """
 
     by_population: dict[str, dict[str, float]]
     provenance: Provenance
     warnings: list[str] = field(default_factory=list)
+    sample_sizes: dict[str, dict[str, float]] = field(default_factory=dict)
 
     def populations(self) -> list[str]:
         return sorted(self.by_population)
 
     def get(self, population: str) -> dict[str, float]:
         return self.by_population.get(population, {})
+
+    def get_sample_sizes(self, population: str) -> dict[str, float]:
+        return self.sample_sizes.get(population, {})
 
 
 def load_afnd_frequencies(
@@ -49,6 +58,7 @@ def load_afnd_frequencies(
     allele_col: str = "allele",
     population_col: str = "population",
     freq_col: str = "allele_frequency",
+    sample_size_col: str | None = "sample_size",
     sep: str | None = None,
     percent: bool = False,
     source: str | None = None,
@@ -59,6 +69,11 @@ def load_afnd_frequencies(
     Frequencies are fractions unless ``percent=True`` (then divided by 100).
     Problems are surfaced in ``FrequencyTable.warnings`` -- nothing is silently
     dropped or coerced.
+
+    ``sample_size_col`` (number of typed individuals per allele row) is OPTIONAL: if
+    that column is absent it is simply skipped (no error), and the resulting
+    ``sample_sizes`` is empty so Monte-Carlo coverage CIs can't be computed -- a
+    surfaced limitation, not a fabricated N.
     """
     path = Path(path)
     prov = Provenance(
@@ -78,9 +93,14 @@ def load_afnd_frequencies(
         return lookup[name.lower()]
 
     a_col, p_col, f_col = resolve(allele_col), resolve(population_col), resolve(freq_col)
+    # sample_size is optional: resolve it only if the caller asked AND it exists.
+    n_col = None
+    if sample_size_col and sample_size_col.lower() in lookup:
+        n_col = lookup[sample_size_col.lower()]
 
     warnings: list[str] = []
     by_pop: dict[str, dict[str, float]] = {}
+    sizes: dict[str, dict[str, float]] = {}
 
     for _, row in df.iterrows():
         allele = normalize_allele(str(row[a_col]))
@@ -106,7 +126,17 @@ def load_afnd_frequencies(
                 f"duplicate {allele} in {pop!r}: kept first ({pop_map[allele]}), "
                 f"ignored {freq} -- aggregate upstream if intended"
             )
-        else:
-            pop_map[allele] = freq
+            continue
+        pop_map[allele] = freq
 
-    return FrequencyTable(by_pop, prov, warnings)
+        if n_col is not None:
+            try:
+                n_ind = float(row[n_col])
+                if n_ind > 0:
+                    sizes.setdefault(pop, {})[allele] = n_ind
+                else:
+                    warnings.append(f"non-positive sample size for {allele}/{pop}; ignored")
+            except (ValueError, TypeError):
+                warnings.append(f"unparseable sample size {row[n_col]!r} for {allele}/{pop}; ignored")
+
+    return FrequencyTable(by_pop, prov, warnings, sizes)

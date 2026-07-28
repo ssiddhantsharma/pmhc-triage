@@ -81,6 +81,30 @@ def test_effective_n_ci_propagated_from_antigen_and_disclosed():
     assert any("antigen-fraction sampling ONLY" in w for w in ts.warnings)
 
 
+def test_mc_interval_attaches_and_is_disclosed():
+    from pmhc_triage.montecarlo import effective_n_interval
+
+    af = Sourced(0.25, Provenance(source="cbio"))
+    af.extra = {"ci95_low": 0.19, "ci95_high": 0.32, "numerator": 50, "denominator": 200}
+    mc = effective_n_interval(
+        incidence=100000, antigen_numerator=50, antigen_denominator=200,
+        covering_alleles=["A*02:01"], allele_freqs={"A*02:01": 0.28},
+        sample_sizes={"A*02:01": 1000}, n_draws=5000,
+    )
+    ts = score_target(
+        gene="KRAS", variant="G12D", disease="PDAC",
+        antigen_fraction=af,
+        incidence_by_population={"Europe": S(100000)},
+        coverage_by_population={"Europe": S(0.48)},
+        mc_by_population={"Europe": mc},
+    )
+    row = ts.rows()[0]
+    assert row["effective_n_mc_median"] is not None
+    assert row["effective_n_mc_ci95"][0] < row["effective_n_mc_median"] < row["effective_n_mc_ci95"][1]
+    # top-level warning now points at the fuller MC interval
+    assert any("Monte-Carlo interval" in w for w in ts.warnings)
+
+
 def test_provenance_log_collects_every_factor():
     ts = score_target(
         gene="KRAS", variant="G12D", disease="PDAC",
