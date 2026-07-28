@@ -1,0 +1,29 @@
+{
+  "capstone_kras_g12d_pancreas": {
+    "Europe": 3708.43,
+    "EastAsia": 22228.92,
+    "SouthAsia": 2983.44
+  },
+  "hla_lever": {
+    "A3-superfamily (real KRAS)": {
+      "Europe": 2267.43842862,
+      "EastAsia": 17208.9776691,
+      "SouthAsia": 2013.32546487
+    },
+    "A*02:01-restricted": {
+      "Europe": 3017.75709807,
+      "EastAsia": 11335.20460479,
+      "SouthAsia": 504.33069500999994
+    },
+    "A*11:01-restricted": {
+      "Europe": 636.82472484,
+      "EastAsia": 16732.982556900002,
+      "SouthAsia": 1489.94255952
+    }
+  },
+  "incidence": {
+    "Europe": 22941,
+    "EastAsia": 122597,
+    "SouthAsia": 20477
+  }
+}

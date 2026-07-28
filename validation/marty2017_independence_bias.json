@@ -1,0 +1,63 @@
+{
+  "source": "Marty et al 2017 Cell 171:1272-1283.e15; open supplement mmc4/mmc5 (ars.els-cdn.com)",
+  "n_recurrent_mutations": 1000,
+  "spearman_count_vs_PHBR4": -0.026,
+  "mean_count_worst_vs_best_quartile": [
+    13.48,
+    5.76
+  ],
+  "enrichment_worst_over_best": 2.34,
+  "within_mutation_OR_median": 1.061,
+  "within_mutation_OR_range": [
+    0.556,
+    2.816
+  ],
+  "within_mutation_FDR_sig_tissues": 0,
+  "within_patients_OR_PAAD": 1.424,
+  "within_patients_OR_PAAD_p": 3.761633e-09,
+  "within_patients_FDR_sig_tissues": 18,
+  "kras_g12_phbr": [
+    {
+      "Gene": "KRAS",
+      "Residue": "G12D",
+      "Count": 188,
+      "pop_PHBR4": 0.2873,
+      "pop_PHBR1": 0.0
+    },
+    {
+      "Gene": "KRAS",
+      "Residue": "G12V",
+      "Count": 170,
+      "pop_PHBR4": 0.823,
+      "pop_PHBR1": 0.0153
+    },
+    {
+      "Gene": "KRAS",
+      "Residue": "G12C",
+      "Count": 98,
+      "pop_PHBR4": 0.543,
+      "pop_PHBR1": 0.0
+    },
+    {
+      "Gene": "KRAS",
+      "Residue": "G12A",
+      "Count": 39,
+      "pop_PHBR4": 0.6926,
+      "pop_PHBR1": 0.0008
+    },
+    {
+      "Gene": "KRAS",
+      "Residue": "G12R",
+      "Count": 36,
+      "pop_PHBR4": 0.5981,
+      "pop_PHBR1": 0.0696
+    },
+    {
+      "Gene": "KRAS",
+      "Residue": "G12S",
+      "Count": 23,
+      "pop_PHBR4": 0.4988,
+      "pop_PHBR1": 0.0
+    }
+  ]
+}

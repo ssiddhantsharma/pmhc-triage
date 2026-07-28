@@ -1,0 +1,39 @@
+pmhc-triage
+Copyright 2026 Siddhant Sharma
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product includes and/or interfaces with third-party data. Attribution and
+licensing for each source:
+
+Bundled data (shipped in this repository)
+-----------------------------------------
+- Cancer incidence figures in `src/pmhc_triage/data/burden_bundle.csv`
+  Source: Global Cancer Observatory, Cancer Today (2024 estimates), International
+  Agency for Research on Cancer / WHO. https://gco.iarc.who.int/today
+  These are a small set of individual, cited incidence figures (World and country
+  proxies for Europe/EastAsia/SouthAsia = Germany/China/India), included as cited
+  reference facts — not a reproduction of the GLOBOCAN database. © IARC/WHO;
+  reused with attribution for research use. Refine per-region for a real analysis.
+
+- Derived validation results in `validation/*.json`, `validation/*.png`
+  Aggregate results (coverage fractions, effective-N estimates, calibration ratios)
+  computed by this tool from the sources below. Facts/derived statistics, cited.
+
+NOT bundled (fetched or supplied at the user's request)
+-------------------------------------------------------
+- HLA allele frequencies: Allele Frequency Net Database (AFND), CC BY-NC.
+  http://www.allelefrequencies.net  — deliberately NOT redistributed. `pmhc-triage
+  fetch-freqs` retrieves them on the user's machine under the user's own AFND terms.
+- Antigen frequencies: cBioPortal (ODbL). https://www.cbioportal.org  — queried live;
+  some studies carry additional non-commercial restrictions (check per study).
+
+Referenced sources (queried at runtime; not redistributed)
+----------------------------------------------------------
+- UniProt (CC BY 4.0) · Open Targets: data CC0, code Apache-2.0 ·
+  MHCflurry (Apache-2.0) · IHME GBD (per IHME terms).
+
+Literature
+----------
+- Marty et al. 2017, Cell 171:1272-1283 (immunoediting / PHBR). Derived summary
+  statistics only (open supplement), cited in `validation/`.
+- Bui et al. 2006, Immunogenetics (HLA population-coverage method).

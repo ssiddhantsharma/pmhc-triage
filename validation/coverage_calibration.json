@@ -1,0 +1,5 @@
+{
+  "variants_compared": 4,
+  "mean_optimism_ratio": 1.3,
+  "note": "tool coverage = >=1 allele presents any spanning peptide at MHCflurry 0.5%; Marty PHBR<4 = harmonic-mean best rank over diploid genotype. Related but the tool metric is systematically more permissive."
+}

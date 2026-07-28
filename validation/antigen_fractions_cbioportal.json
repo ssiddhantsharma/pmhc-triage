@@ -1,0 +1,146 @@
+[
+  {
+    "gene": "KRAS",
+    "variant": "G12D",
+    "study": "paad_tcga_pan_can_atlas_2018",
+    "cancer": "PDAC",
+    "fraction": 0.273743,
+    "numer": 49,
+    "denom": 179,
+    "ci": [
+      0.213692,
+      0.343302
+    ],
+    "method": "G12D: 49/179 sequenced samples in paad_tcga_pan_can_atlas_2018 (cBioPortal ODbL; profile paad_tcga_pan_can_atlas_2018_mutations)",
+    "missing": false,
+    "warn": []
+  },
+  {
+    "gene": "KRAS",
+    "variant": "G12V",
+    "study": "paad_tcga_pan_can_atlas_2018",
+    "cancer": "PDAC",
+    "fraction": 0.184358,
+    "numer": 33,
+    "denom": 179,
+    "ci": [
+      0.134391,
+      0.247587
+    ],
+    "method": "G12V: 33/179 sequenced samples in paad_tcga_pan_can_atlas_2018 (cBioPortal ODbL; profile paad_tcga_pan_can_atlas_2018_mutations)",
+    "missing": false,
+    "warn": []
+  },
+  {
+    "gene": "KRAS",
+    "variant": "G12R",
+    "study": "paad_tcga_pan_can_atlas_2018",
+    "cancer": "PDAC",
+    "fraction": 0.139665,
+    "numer": 25,
+    "denom": 179,
+    "ci": [
+      0.096423,
+      0.198048
+    ],
+    "method": "G12R: 25/179 sequenced samples in paad_tcga_pan_can_atlas_2018 (cBioPortal ODbL; profile paad_tcga_pan_can_atlas_2018_mutations)",
+    "missing": false,
+    "warn": []
+  },
+  {
+    "gene": "KRAS",
+    "variant": "G12D",
+    "study": "coadread_tcga_pan_can_atlas_2018",
+    "cancer": "CRC",
+    "fraction": 0.108614,
+    "numer": 58,
+    "denom": 534,
+    "ci": [
+      0.084965,
+      0.137855
+    ],
+    "method": "G12D: 58/534 sequenced samples in coadread_tcga_pan_can_atlas_2018 (cBioPortal ODbL; profile coadread_tcga_pan_can_atlas_2018_mutations)",
+    "missing": false,
+    "warn": []
+  },
+  {
+    "gene": "KRAS",
+    "variant": "G12V",
+    "study": "coadread_tcga_pan_can_atlas_2018",
+    "cancer": "CRC",
+    "fraction": 0.09176,
+    "numer": 49,
+    "denom": 534,
+    "ci": [
+      0.070104,
+      0.119248
+    ],
+    "method": "G12V: 49/534 sequenced samples in coadread_tcga_pan_can_atlas_2018 (cBioPortal ODbL; profile coadread_tcga_pan_can_atlas_2018_mutations)",
+    "missing": false,
+    "warn": []
+  },
+  {
+    "gene": "KRAS",
+    "variant": "G12C",
+    "study": "luad_tcga_pan_can_atlas_2018",
+    "cancer": "LUAD",
+    "fraction": 0.123675,
+    "numer": 70,
+    "denom": 566,
+    "ci": [
+      0.099063,
+      0.153361
+    ],
+    "method": "G12C: 70/566 sequenced samples in luad_tcga_pan_can_atlas_2018 (cBioPortal ODbL; profile luad_tcga_pan_can_atlas_2018_mutations)",
+    "missing": false,
+    "warn": []
+  },
+  {
+    "gene": "KRAS",
+    "variant": "G12D",
+    "study": "luad_tcga_pan_can_atlas_2018",
+    "cancer": "LUAD",
+    "fraction": 0.035336,
+    "numer": 20,
+    "denom": 566,
+    "ci": [
+      0.022989,
+      0.053948
+    ],
+    "method": "G12D: 20/566 sequenced samples in luad_tcga_pan_can_atlas_2018 (cBioPortal ODbL; profile luad_tcga_pan_can_atlas_2018_mutations)",
+    "missing": false,
+    "warn": []
+  },
+  {
+    "gene": "TP53",
+    "variant": "R175H",
+    "study": "brca_tcga_pan_can_atlas_2018",
+    "cancer": "BRCA",
+    "fraction": 0.0197,
+    "numer": 21,
+    "denom": 1066,
+    "ci": [
+      0.01292,
+      0.029929
+    ],
+    "method": "R175H: 21/1066 sequenced samples in brca_tcga_pan_can_atlas_2018 (cBioPortal ODbL; profile brca_tcga_pan_can_atlas_2018_mutations)",
+    "missing": false,
+    "warn": []
+  },
+  {
+    "gene": "TP53",
+    "variant": "R248Q",
+    "study": "brca_tcga_pan_can_atlas_2018",
+    "cancer": "BRCA",
+    "fraction": 0.003752,
+    "numer": 4,
+    "denom": 1066,
+    "ci": [
+      0.00146,
+      0.009608
+    ],
+    "method": "R248Q: 4/1066 sequenced samples in brca_tcga_pan_can_atlas_2018 (cBioPortal ODbL; profile brca_tcga_pan_can_atlas_2018_mutations)",
+    "missing": false,
+    "warn": []
+  }
+]
