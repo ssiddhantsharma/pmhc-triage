@@ -1,5 +1,8 @@
 # pmhc-triage
 
+[![CI](https://github.com/ssiddhantsharma/pmhc-triage/actions/workflows/ci.yml/badge.svg)](https://github.com/ssiddhantsharma/pmhc-triage/actions/workflows/ci.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+
 **HLA-coverage-adjusted estimates of how many patients a pMHC / T-cell immunotherapy target can actually reach.**
 
 ## Why
