@@ -1,6 +1,6 @@
 # pmhc-triage
 
-**HLA-coverage-adjusted estimates of how many patients a pMHC / T-cell immunotherapy target can actually reach — with a primary source on every number.**
+**HLA-coverage-adjusted estimates of how many patients a pMHC / T-cell immunotherapy target can actually reach.**
 
 ## Why
 
