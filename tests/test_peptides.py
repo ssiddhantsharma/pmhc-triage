@@ -55,3 +55,12 @@ def test_provenance_records_method():
     d = s.to_dict()
     assert "G12D" in d["provenance"]["method"]
     assert d["provenance"]["query_date"]
+
+
+def test_synonymous_substitution_rejected():
+    import pytest
+    from pmhc_triage.peptides import parse_substitution, mutant_peptides
+    with pytest.raises(ValueError, match="does not change"):
+        parse_substitution("G12G")
+    r = mutant_peptides("MTEYKLVVVGAGGVGKSALTIQ", "G12G")
+    assert r.is_missing

@@ -26,6 +26,7 @@ package treating numbers as sourced and reproducible, not stochastic surprises.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -103,9 +104,15 @@ def sample_coverage(
         with a warning if no covering allele has a known frequency -- mirroring the
         point-estimate module, a missing frequency is never treated as 0.
     """
-    norm_freqs = {normalize_allele(k): float(v) for k, v in allele_freqs.items()}
+    norm_freqs: dict[str, float] = {}
+    for k, v in allele_freqs.items():
+        try:
+            norm_freqs[normalize_allele(k)] = float(v)
+        except (TypeError, ValueError):
+            pass
     norm_n = {normalize_allele(k): v for k, v in (sample_sizes or {}).items()}
-    covering = [normalize_allele(a) for a in covering_alleles]
+    # De-duplicate (order-preserving): an allele listed twice must not double-count.
+    covering = list(dict.fromkeys(normalize_allele(a) for a in covering_alleles))
     warnings: list[str] = []
 
     # Per-locus list of (n_draws,) frequency-sample arrays for covering alleles present.
@@ -116,8 +123,15 @@ def sample_coverage(
         if allele not in norm_freqs:
             missing.append(allele)
             continue
-        locus = parse_locus(allele)
+        try:
+            locus = parse_locus(allele)
+        except ValueError:
+            missing.append(allele)  # malformed -> excluded + surfaced, never crash
+            continue
         p_hat = norm_freqs[allele]
+        if not math.isfinite(p_hat) or p_hat < 0.0 or p_hat > 1.0:
+            missing.append(allele)  # NaN/inf/out-of-range -> excluded, never sampled
+            continue
         n_ind = norm_n.get(allele)
         if n_ind and n_ind > 0:
             two_n = 2 * float(n_ind)  # chromosomes

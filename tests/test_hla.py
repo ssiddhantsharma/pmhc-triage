@@ -123,3 +123,30 @@ def test_coverage_by_population():
     )
     assert set(out) == {"Europe", "EastAsia"}
     assert out["Europe"].value > out["EastAsia"].value  # higher freq -> higher coverage
+
+
+# --- audit regressions (adversarial inputs must not silently corrupt coverage) ---
+
+def test_duplicate_covering_alleles_not_double_counted():
+    # "HLA-A*02:01" and "A*02:01" normalize to the same allele -> must count ONCE
+    one = population_coverage(["A*02:01"], {"A*02:01": 0.28}, "X").value
+    dup = population_coverage(["HLA-A*02:01", "A*02:01"], {"A*02:01": 0.28}, "X").value
+    assert dup == one == pytest.approx(0.4816)
+
+
+def test_nan_or_inf_frequency_is_surfaced_missing_not_laundered():
+    for bad in (float("nan"), float("inf"), -0.1, 1.5):
+        s = population_coverage(["A*02:01"], {"A*02:01": bad}, "X")
+        assert s.is_missing, f"{bad} should be excluded"
+        assert any("non-finite" in w or "out-of-range" in w for w in s.warnings)
+
+
+def test_malformed_allele_surfaced_not_crash():
+    s = population_coverage(["GARBAGE", "A*02:01"], {"A*02:01": 0.28}, "X")
+    assert s.value == pytest.approx(0.4816)  # good allele still computes
+    assert any("malformed" in w for w in s.warnings)
+
+
+def test_non_numeric_frequency_value_does_not_crash():
+    s = population_coverage(["A*02:01"], {"A*02:01": "not-a-number"}, "X")
+    assert s.is_missing  # unparseable freq -> allele reads as no-frequency, surfaced

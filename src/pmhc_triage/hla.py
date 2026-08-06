@@ -33,6 +33,7 @@ provenance (AFND, population, method, query date) and any warnings travel with i
 
 from __future__ import annotations
 
+import math
 from collections import defaultdict
 from typing import Iterable, Mapping
 
@@ -114,23 +115,44 @@ def population_coverage(
     """
     prov = Provenance(source=_AFND, url=url, query_date=today_iso(), method=_METHOD)
 
-    norm_freqs = {normalize_allele(k): float(v) for k, v in allele_freqs.items()}
-    covering = [normalize_allele(a) for a in covering_alleles]
+    # Parse frequencies defensively: a non-numeric value is dropped (the allele then
+    # reads as "no frequency" and is surfaced), never crashes the computation.
+    norm_freqs: dict[str, float] = {}
+    for k, v in allele_freqs.items():
+        try:
+            norm_freqs[normalize_allele(k)] = float(v)
+        except (TypeError, ValueError):
+            pass
+
+    # De-duplicate covering alleles (order-preserving). An allele listed twice -- e.g.
+    # "HLA-A*02:01" and "A*02:01", which normalize to the same -- must NOT double-count
+    # its frequency into the per-locus sum (that silently inflates coverage).
+    covering = list(dict.fromkeys(normalize_allele(a) for a in covering_alleles))
 
     if not covering:
         return Sourced(None, prov).warn("no covering alleles provided")
 
-    # Sum covering-allele frequencies per locus; track which are missing.
+    # Sum covering-allele frequencies per locus; track missing / malformed / invalid.
     per_locus: dict[str, float] = defaultdict(float)
     loci_with_data: set[str] = set()
     missing: list[str] = []
+    malformed: list[str] = []
+    invalid: list[str] = []
     for allele in covering:
-        locus = parse_locus(allele)
-        if allele in norm_freqs:
-            per_locus[locus] += norm_freqs[allele]
-            loci_with_data.add(locus)
-        else:
+        try:
+            locus = parse_locus(allele)
+        except ValueError:
+            malformed.append(allele)  # surface, don't crash the whole run for one bad allele
+            continue
+        if allele not in norm_freqs:
             missing.append(allele)
+            continue
+        f = norm_freqs[allele]
+        if not math.isfinite(f) or f < 0.0 or f > 1.0:
+            invalid.append(allele)  # NaN/inf/out-of-range freq -> excluded + surfaced, never laundered
+            continue
+        per_locus[locus] += f
+        loci_with_data.add(locus)
 
     result: Sourced[float]
     if not loci_with_data:
@@ -155,6 +177,14 @@ def population_coverage(
         result.warn(
             "excluded (no frequency in "
             f"{population!r}, NOT treated as 0): {', '.join(sorted(missing))}"
+        )
+    if invalid:
+        result.warn(
+            f"excluded (non-finite or out-of-range frequency, NOT treated as 0): {', '.join(sorted(invalid))}"
+        )
+    if malformed:
+        result.warn(
+            f"excluded (malformed allele, no locus): {', '.join(sorted(malformed))}"
         )
     if any(hla_class(a) == "II" for a in covering):
         result.warn(

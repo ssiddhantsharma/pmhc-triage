@@ -13,6 +13,7 @@ silent-error hazard, so keep the labels identical to those in your frequency tab
 from __future__ import annotations
 
 import io
+import math
 from importlib.resources import files
 from pathlib import Path
 
@@ -84,8 +85,8 @@ def manual_incidence(
         value = float(cases_per_year)
     except (TypeError, ValueError):
         return Sourced(None, prov).warn(f"non-numeric incidence {cases_per_year!r}")
-    if value < 0:
-        return Sourced(None, prov).warn(f"incidence must be >= 0, got {value}")
+    if not math.isfinite(value) or value < 0:
+        return Sourced(None, prov).warn(f"incidence must be finite and >= 0, got {value}")
     return Sourced(value, prov)
 
 
@@ -128,7 +129,14 @@ def load_burden_table(
             method=f"incidence for {disease} in {pop} (from {path.name})",
         )
         try:
-            out[pop] = Sourced(float(str(row[i_col]).replace(",", "").strip()), prov)
+            value = float(str(row[i_col]).replace(",", "").strip())
         except ValueError:
             out[pop] = Sourced(None, prov).warn(f"non-numeric incidence {row[i_col]!r}")
+            continue
+        # Reject non-finite / negative incidence rather than laundering a garbage
+        # (e.g. negative -> negative effective_N). Matches manual_incidence's guard.
+        if not math.isfinite(value) or value < 0:
+            out[pop] = Sourced(None, prov).warn(f"invalid incidence {row[i_col]!r} (must be finite and >= 0)")
+            continue
+        out[pop] = Sourced(value, prov)
     return out

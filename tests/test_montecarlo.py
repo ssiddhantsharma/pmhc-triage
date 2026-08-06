@@ -157,3 +157,11 @@ def test_different_seed_differs_slightly():
     a = effective_n_interval(**kw, seed=1).median
     b = effective_n_interval(**kw, seed=2).median
     assert a != b  # tiny cohort -> visible MC noise between seeds
+
+
+def test_mc_duplicate_alleles_not_double_counted():
+    kw = dict(incidence=100000, antigen_numerator=50, antigen_denominator=200,
+              allele_freqs={"A*02:01": 0.28}, sample_sizes={"A*02:01": 1000}, n_draws=4000, seed=0)
+    single = effective_n_interval(covering_alleles=["A*02:01"], **kw)
+    dup = effective_n_interval(covering_alleles=["A*02:01", "HLA-A*02:01"], **kw)
+    assert dup.median == pytest.approx(single.median, abs=1.0)

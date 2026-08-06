@@ -19,6 +19,9 @@ def wilson_ci(successes: int, n: int, z: float = 1.96) -> tuple[float, float]:
     """
     if n <= 0:
         return (0.0, 1.0)
+    # Defensive: clamp successes into [0, n] so a caller passing an out-of-range count
+    # can't drive p out of [0,1] and trigger a sqrt-of-negative (math domain error).
+    successes = min(max(successes, 0), n)
     p = successes / n
     denom = 1.0 + z * z / n
     center = (p + z * z / (2 * n)) / denom

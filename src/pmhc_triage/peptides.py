@@ -38,6 +38,11 @@ def parse_substitution(variant: str) -> tuple[str, int, str]:
     wt, pos, mut = m.group(1), int(m.group(2)), m.group(3)
     if pos < 1:
         raise ValueError("position must be 1-indexed (>= 1)")
+    if wt == mut:
+        raise ValueError(
+            f"substitution {variant!r} does not change the residue (WT == MUT); "
+            "not a neoepitope-generating variant"
+        )
     return wt, pos, mut
 
 

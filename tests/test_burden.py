@@ -81,3 +81,18 @@ def test_bundled_per_region_surfaces_country_proxy_note():
 def test_bundled_per_region_unknown_population_missing():
     s = load_bundled("pancreatic cancer", population="Antarctica")
     assert s.is_missing
+
+
+# --- audit regression: invalid incidence must never become effective_N ---
+
+def test_burden_table_rejects_negative_and_nonfinite(tmp_path):
+    p = tmp_path / "b.csv"
+    p.write_text("disease,population,incidence\nX,Europe,-5000\nX,EastAsia,nan\nX,World,1000\n")
+    out = load_burden_table(p, "X")
+    assert out["Europe"].is_missing and any("invalid" in w for w in out["Europe"].warnings)
+    assert out["EastAsia"].is_missing
+    assert out["World"].value == 1000.0  # the good row still loads
+
+
+def test_manual_incidence_rejects_nan():
+    assert manual_incidence("X", "Europe", float("nan"), source="s").is_missing
