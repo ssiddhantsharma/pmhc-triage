@@ -38,7 +38,7 @@ pmhc-triage score --gene KRAS --variant G12D --disease "pancreatic cancer" \
   --populations Europe,EastAsia,SouthAsia --freqs freqs.tsv
 ```
 
-→ per-population effective-N, a Monte-Carlo 95% interval, and a provenance record for every factor. Other commands: `discover` (disease → candidate targets), `run` (batch YAML), `validate` (fail-fast preflight).
+→ a `rich` terminal table of per-population effective-N, a Monte-Carlo 95% interval, and a provenance record for every factor. Add `--rank` to sort multiple targets/populations by effective addressable-N (the "which target reaches the most patients" view). Other commands: `discover` (disease → candidate targets), `run` (batch YAML, `--rank`-aware), `validate` (fail-fast preflight).
 
 ## Design principles
 
@@ -50,6 +50,13 @@ pmhc-triage score --gene KRAS --variant G12D --disease "pancreatic cancer" \
 ## Does the number hold up?
 
 See [`validation/`](validation/) for the evidence, honestly reported: the tool recovers known KRAS G12D restriction (A\*03:01/A\*11:01) from sequence; HLA-adjustment reorders targets across restriction families and populations but is a flat multiplier within a shared HLA superfamily; the multiplicative model's independence bias is bounded from Marty et al. 2017. It is **not** validated against a ground-truth addressable population, so treat outputs as *sourced, reproducible estimates*, not measured truth.
+
+A subset of these checks is committed as **reproducible live tests** that assert the tool agrees with known biology (KRAS G12D fraction ~0.27, UniProt residue 12 = G, MHCflurry recovering A\*03:01/A\*11:01). They hit external services, so they are kept out of the hermetic default/CI run and are invoked explicitly:
+
+```bash
+pytest        # hermetic unit tests (mocked APIs) — what CI runs
+pytest -m live # validation: live checks vs known biology (self-skip if a service is down)
+```
 
 ## Data & license
 

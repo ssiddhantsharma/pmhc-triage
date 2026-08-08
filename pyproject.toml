@@ -29,6 +29,7 @@ dependencies = [
   "pandas>=1.5",
   "httpx>=0.24",
   "pyyaml>=6.0",
+  "rich>=13.0",
 ]
 
 [project.optional-dependencies]
@@ -45,6 +46,12 @@ packages = ["src/pmhc_triage"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Live validation tests hit external APIs (cBioPortal/UniProt/MHCflurry); excluded
+# from the default + CI run so the suite stays hermetic. Run them with: pytest -m live
+addopts = "-m 'not live'"
+markers = [
+  "live: validation checks that hit external services; run explicitly with -m live",
+]
 
 [tool.ruff]
 target-version = "py310"

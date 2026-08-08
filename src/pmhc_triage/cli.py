@@ -42,8 +42,8 @@ def _spec_from_args(a: argparse.Namespace) -> TargetSpec:
     )
 
 
-def _print_summary(spec: TargetSpec, ts) -> None:
-    print(f"\n{spec.gene} {spec.variant} / {spec.disease}")
+def _print_summary(ts) -> None:
+    print(f"\n{ts.gene} {ts.variant} / {ts.disease}")
     for row in ts.rows():
         if row["effective_n"] is not None:
             ci = row.get("effective_n_ci95_antigen_only")
@@ -57,6 +57,20 @@ def _print_summary(spec: TargetSpec, ts) -> None:
             print(f"  {row['population']:12s} effective_N = n/a  ({'; '.join(row['reasons'])})")
     for w in ts.warnings:
         print(f"  ! {w}")
+
+
+def _render(scores: list, *, rank: bool = False) -> None:
+    """Render scored targets with rich; fall back to plain text if rich is absent."""
+    try:
+        from rich.console import Console
+
+        from .render import render, render_rank
+    except ImportError:  # pragma: no cover - rich is a core dep, this is belt-and-suspenders
+        for ts in scores:
+            _print_summary(ts)
+        return
+    console = Console()
+    (render_rank if rank else render)(scores, console)
 
 
 def _add_score_args(p: argparse.ArgumentParser) -> None:
@@ -82,6 +96,8 @@ def _add_score_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--out", default="results.csv")
     p.add_argument("--provenance-out", dest="provenance_out", default=None)
     p.add_argument("--cache", default=None, help="cache dir for reproducible/offline re-runs")
+    p.add_argument("--rank", action="store_true",
+                   help="render one comparison table sorted by effective addressable-N")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -109,6 +125,8 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--out", default="results.csv")
     r.add_argument("--provenance-out", dest="provenance_out", default=None)
     r.add_argument("--cache", default=None, help="cache dir for reproducible/offline re-runs")
+    r.add_argument("--rank", action="store_true",
+                   help="render one comparison table sorted by effective addressable-N")
 
     ff = sub.add_parser(
         "fetch-freqs",
@@ -140,7 +158,7 @@ def _cmd_score(a: argparse.Namespace) -> int:
     finally:
         if client is not None:
             client.close()
-    _print_summary(spec, ts)
+    _render([ts], rank=getattr(a, "rank", False))
     csv_path = write_results_csv([ts], a.out)
     prov_path = write_provenance_json([ts], _provenance_path(a.out, a.provenance_out))
     print(f"\nwrote {csv_path} and {prov_path}")
@@ -220,12 +238,11 @@ def _cmd_run(a: argparse.Namespace) -> int:
     scores = []
     try:
         for spec in specs:
-            ts = run_target(spec, client=client)
-            _print_summary(spec, ts)
-            scores.append(ts)
+            scores.append(run_target(spec, client=client))
     finally:
         if client is not None:
             client.close()
+    _render(scores, rank=getattr(a, "rank", False))
     csv_path = write_results_csv(scores, a.out)
     prov_path = write_provenance_json(scores, _provenance_path(a.out, a.provenance_out))
     print(f"\nwrote {csv_path} and {prov_path}")
