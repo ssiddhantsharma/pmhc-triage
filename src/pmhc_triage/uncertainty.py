@@ -1,9 +1,7 @@
-"""Small-sample uncertainty helpers.
+"""Wilson score interval for a binomial proportion.
 
-A proportion estimated from 49/179 samples is not the same evidence as 4900/17900,
-even though both are ~0.27. We attach a Wilson score interval (better than the
-normal approximation at small n and near 0/1) so downstream consumers can see how
-soft a fraction is.
+49/179 and 4900/17900 are both ~0.27 but not the same evidence; the Wilson interval
+(better than the normal approximation at small n and near 0/1) shows how soft it is.
 """
 
 from __future__ import annotations

@@ -1,14 +1,9 @@
 """Orchestrate the factors into a scored target, plus a fail-fast preflight.
 
-``run_target`` wires the modules together: antigen (cBioPortal) + tractability
-context (Open Targets) + HLA coverage (your AFND-format frequencies) + burden
-(your incidence table/values) -> the score gate. It never fabricates: any factor
-that can't be fetched arrives at the score step as a surfaced ``Sourced(None)``.
-
-``preflight`` is the clean early exit -- it checks the joins *before* running so a
-misspelled study, a population absent from the frequency file, or a variant whose
-wild-type residue doesn't match UniProt is caught up front rather than producing a
-confident-looking but meaningless number.
+run_target wires antigen (cBioPortal) + tractability (Open Targets) + HLA coverage
+(AFND) + burden (incidence) into the score gate; a factor that can't be fetched
+arrives as a surfaced Sourced(None), never fabricated. preflight checks the joins
+before running (study, population labels, variant WT vs UniProt).
 """
 
 from __future__ import annotations
@@ -157,9 +152,8 @@ def run_target(spec: TargetSpec, *, client: httpx.Client | None = None) -> Targe
                 spec.disease, pop, cases, source=spec.burden_source or "inline config value"
             )
     else:
-        # No user burden supplied -> fall back to the shipped cited starter bundle
-        # (World + per-region country-proxy figures). Missing disease/population simply
-        # doesn't populate that key, and the score gate surfaces it as missing (never 0).
+        # no user burden -> fall back to the shipped cited bundle; an absent
+        # disease/population just isn't populated (score gate surfaces it, never 0)
         for pop in spec.populations:
             s = load_bundled(spec.disease, population=pop)
             if not s.is_missing:

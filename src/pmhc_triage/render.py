@@ -1,15 +1,8 @@
-"""Rich terminal rendering of scored targets.
+"""Rich terminal rendering of scored targets (presentation only).
 
-Kept separate from the core so the package stays importable without rich; the CLI
-falls back to plain text (``cli._print_summary``) if rich is unavailable. Nothing
-here computes anything -- it only presents a :class:`~pmhc_triage.score.TargetScore`.
-
-Two views:
-- :func:`render`         -- one panel per target, per-population factor table.
-- :func:`render_rank`    -- one table across all (target, population), sorted by
-                            effective addressable-N (the "which target reaches the
-                            most patients" view). Missing rows sort to the bottom,
-                            never silently dropped.
+Kept separate so the package imports without rich; the CLI falls back to plain text if
+rich is absent. render: one panel per target. render_rank: one table across all
+(target, population) sorted by effective-N, with missing rows last (never dropped).
 """
 
 from __future__ import annotations
@@ -78,7 +71,7 @@ def render_rank(scores, console: Console | None = None) -> None:
     """Print a single table across all (target, population), most-addressable first.
 
     Rows with a missing effective-N sort to the bottom (kept + shown with the reason),
-    never dropped -- consistent with the tool's surface-never-hide rule.
+    never dropped, consistent with the tool's surface-never-hide rule.
     """
     console = console or Console()
     rows = []

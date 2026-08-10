@@ -1,13 +1,9 @@
-"""Disease burden (incidence) -- user-supplied or parsed from a table (not bundled).
+"""Disease burden (incidence): user-supplied value, parsed table, or the cited bundle.
 
-There is no clean free API for cancer incidence, and GLOBOCAN/IARC and GBD carry
-their own terms, so -- exactly as with AFND -- we do **not** bundle burden data.
-You provide it: either a single manual value, or a CSV/TSV you export (e.g. from
-GLOBOCAN) parsed here into per-population Sourced values. Cite your source.
-
-Incidence is returned per population so it can join with HLA coverage on the same
-population label in the score step. Mismatched population labels are the biggest
-silent-error hazard, so keep the labels identical to those in your frequency table.
+Cancer incidence carries source-specific terms (GLOBOCAN/IARC, GBD), so most of it is
+user-supplied; a small cited starter bundle ships for convenience. Incidence is keyed
+by population so it joins HLA coverage on the same label in the score step. Keep the
+labels identical to the frequency table: label mismatch is the main silent-error hazard.
 """
 
 from __future__ import annotations
@@ -56,7 +52,7 @@ def load_bundled(disease: str, *, population: str = "World") -> Sourced[float]:
         Provenance(source=str(row["source"]), query_date=today_iso(),
                    method=f"curated GLOBOCAN-2022 bundle: {row['note']}"),
     )
-    # Surface the bundle's caveats at RUNTIME, not just in the CSV file.
+    # surface the bundle's caveats at runtime, not just in the CSV
     result.warn(f"bundle note: {row['note']}")
     if str(row["population"]).strip().lower() == "world":
         result.warn(
@@ -133,8 +129,7 @@ def load_burden_table(
         except ValueError:
             out[pop] = Sourced(None, prov).warn(f"non-numeric incidence {row[i_col]!r}")
             continue
-        # Reject non-finite / negative incidence rather than laundering a garbage
-        # (e.g. negative -> negative effective_N). Matches manual_incidence's guard.
+        # reject non-finite/negative (a negative would become a negative effective_N)
         if not math.isfinite(value) or value < 0:
             out[pop] = Sourced(None, prov).warn(f"invalid incidence {row[i_col]!r} (must be finite and >= 0)")
             continue

@@ -1,16 +1,9 @@
-"""Identity normalization for the join hazard: population + disease label matching.
+"""Population + disease label matching, to catch the join hazard.
 
-The single biggest silent-error risk in this tool is a **label mismatch** across
-sources -- burden's "European", the frequency file's "Europe", and a requested
-"europe" are the same thing, but string-compared they don't join, and the product
-silently drops. This module canonicalizes only *true synonyms* (spelling / case /
-spacing / a short curated alias list). It deliberately does **not** map a country
-to a region or an ethnicity to a population -- those are modeling choices the user
-must make explicitly, not silent merges.
-
-The philosophy stays "surface, don't silently fix": these helpers are used to
-*warn and suggest* (e.g. "'European' in freqs matches requested 'Europe'"), not to
-rewrite the scoring path behind the user's back.
+The main silent-error risk is a label mismatch across sources ("European" vs "Europe"
+vs "europe"), which fails to join and drops the product. These helpers canonicalize
+only true synonyms (case/spacing/a short alias list) and warn/suggest; they never map
+a country to a region or an ethnicity to a population, and never rewrite the scoring path.
 """
 
 from __future__ import annotations
@@ -71,7 +64,7 @@ def suggest_match(target: str, candidates: Iterable[str]) -> str | None:
 
 
 # Generic oncology words dropped before comparing a disease label to a study's
-# cancer type -- so the comparison keys on the organ/lineage word (pancreatic, breast).
+# cancer type, so the comparison keys on the organ/lineage word (pancreatic, breast).
 _GENERIC_ONCOLOGY = {
     "carcinoma", "cancer", "adenocarcinoma", "invasive", "tumor", "tumour",
     "neoplasm", "malignant", "cell", "of", "the", "and", "a",

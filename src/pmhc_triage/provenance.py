@@ -1,22 +1,8 @@
-"""Provenance primitive: every value the tool emits carries where it came from.
+"""Provenance primitives: every emitted value carries where it came from.
 
-The whole point of ``pmhc-triage`` is *sourced, reproducible* numbers. A language
-model will happily invent an incidence figure or an allele frequency; this module
-makes that impossible here by forcing every number to travel with its source, URL,
-query date, and derivation method -- and by *surfacing* (never silently dropping)
-missing inputs.
-
-Two types:
-
-``Provenance``
-    Where a single datum came from: a human-readable ``source``, an optional
-    ``url``, the ISO ``query_date`` it was retrieved/computed, and the ``method``
-    used to derive it.
-
-``Sourced[T]``
-    A value bound to its ``Provenance``, plus a list of ``warnings``. A value of
-    ``None`` means *missing* -- the caller must be able to see that a factor could
-    not be computed, rather than have a zero laundered into the final number.
+Provenance: source, optional url, query_date, derivation method.
+Sourced[T]: a value bound to its Provenance plus warnings; value None means missing
+(a factor that could not be computed), never a laundered zero.
 """
 
 from __future__ import annotations
@@ -29,22 +15,16 @@ T = TypeVar("T")
 
 
 def today_iso() -> str:
-    """UTC date as ``YYYY-MM-DD`` -- used to stamp ``query_date`` on retrievals."""
+    """UTC date as YYYY-MM-DD."""
     return datetime.now(timezone.utc).date().isoformat()
 
 
-# Header the caching transport sets to the datetime data was ACTUALLY fetched.
+# Header the caching transport stamps with the original fetch datetime.
 CACHE_FETCHED_AT_HEADER = "x-pmhc-fetched-at"
 
 
 def fetched_at_or_today(response) -> str:
-    """When the data was really fetched.
-
-    If ``response`` came from the on-disk cache, this is the ORIGINAL fetch datetime
-    (so provenance never claims a re-run date it didn't happen on). For a fresh
-    fetch the header is absent and we fall back to today's date. This keeps
-    ``query_date`` honest whether or not caching is used.
-    """
+    """Original fetch datetime if the response came from cache, else today's date."""
     try:
         value = response.headers.get(CACHE_FETCHED_AT_HEADER)
     except Exception:
@@ -67,11 +47,10 @@ class Provenance:
 
 @dataclass
 class Sourced(Generic[T]):
-    """A value bound to its provenance. ``value is None`` means the datum is missing.
+    """A value bound to its provenance; value None means missing.
 
-    ``extra`` carries optional structured metadata about the value -- e.g. the
-    sample size ``n`` and confidence interval behind a fraction -- so a number from
-    n=23 is never silently trusted like one from n=1500.
+    extra carries optional structured metadata (e.g. sample size and CI behind a
+    fraction) so a number from n=23 is not trusted like one from n=1500.
     """
 
     value: T | None

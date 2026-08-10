@@ -1,10 +1,4 @@
-"""pmhc-triage: HLA-coverage-adjusted addressable-population estimates for pMHC targets.
-
-Public API is intentionally small and grows as modules land. Currently:
-
-- :mod:`pmhc_triage.provenance` -- ``Provenance`` / ``Sourced`` (every number is sourced)
-- :mod:`pmhc_triage.hla` -- diploid population coverage (the load-bearing core)
-"""
+"""pmhc-triage: HLA-coverage-adjusted addressable-population estimates for pMHC targets."""
 
 from __future__ import annotations
 

@@ -1,10 +1,7 @@
-"""Protein sequences from UniProt -- always the primary source, never a summary.
+"""Canonical protein sequence from the UniProt REST .fasta endpoint.
 
-Text/LLM summaries of UniProt entries can misreport sequence length and invent
-residue boundaries, which would silently shift every downstream peptide index. So
-this module pulls the canonical sequence straight from the UniProt REST ``.fasta``
-endpoint and records the exact URL + query date in the provenance. It never
-guesses a sequence.
+Pulled from the primary source (not a summary, which can misreport length and shift
+every downstream peptide index), with the exact URL + query date in provenance.
 """
 
 from __future__ import annotations
@@ -26,7 +23,7 @@ def fetch_uniprot_sequence(
 
     Returns a :class:`~pmhc_triage.provenance.Sourced` string. On any failure
     (network error, non-200, malformed body) the value is ``None`` and the reason
-    is surfaced in ``warnings`` -- never a silent empty string.
+    is surfaced in ``warnings``, never a silent empty string.
 
     ``client`` may be injected (e.g. an ``httpx.Client`` with a mock transport)
     for hermetic testing.

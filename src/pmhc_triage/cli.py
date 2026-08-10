@@ -1,8 +1,7 @@
-"""Command-line entry point: score (flags), run (YAML config), validate (preflight).
+"""Command-line entry point: score, run (YAML), validate, discover, fetch-freqs.
 
 score/run compute effective addressable-N and write results.csv + provenance.json.
-validate is the fail-fast preflight -- it checks joins and exits non-zero on issues
-*before* any run.
+validate is the fail-fast preflight (checks joins, exits non-zero on issues).
 """
 
 from __future__ import annotations

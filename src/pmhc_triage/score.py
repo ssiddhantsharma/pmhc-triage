@@ -1,17 +1,11 @@
-"""Combine the factors into an effective addressable-N -- the exit gate.
+"""The exit gate: combine the factors into effective addressable-N.
 
-This is the single place where the pipeline decides whether a number can be emitted
-at all. Three rules, all "fail loud, never fake":
-
-1. **Join guard.** ``effective_N(population) = incidence x antigen_fraction x
-   hla_coverage`` is computed ONLY per matching population label. Incidence and HLA
-   coverage must refer to the *same* population, or they are simply not combined --
-   there is no code path that multiplies incidence["India"] by coverage["Europe"].
-2. **Propagate missing.** If any required factor for a population is missing
-   (``None``), that population's ``effective_n`` is ``None`` *with the reasons* --
-   never silently ``0``.
-3. **One provenance log.** Every factor's provenance is collected into a single
-   auditable log for the whole result.
+Three rules:
+1. Join guard: effective_N = incidence x antigen x coverage is computed only per
+   matching population label; incidence and coverage are never combined across labels.
+2. Propagate missing: if a required factor is missing, effective_n is None with the
+   reasons, never a silent 0.
+3. One provenance log per result.
 """
 
 from __future__ import annotations
@@ -33,11 +27,10 @@ class PopulationScore:
     antigen_fraction: Sourced[float]
     hla_coverage: Sourced[float] | None
     reasons: list[str] = field(default_factory=list)
-    # range from the antigen-fraction 95% CI ONLY (incidence + coverage uncertainty NOT modeled)
+    # range from the antigen-fraction CI only (incidence/coverage not modeled here)
     effective_n_low: float | None = None
     effective_n_high: float | None = None
-    # full Monte-Carlo interval (antigen + coverage sampling; incidence per its own rule)
-    mc: MCResult | None = None
+    mc: MCResult | None = None  # fuller Monte-Carlo interval (antigen + coverage)
 
     @property
     def computable(self) -> bool:
@@ -81,7 +74,7 @@ class TargetScore:
     warnings: list[str] = field(default_factory=list)
 
     def rows(self) -> list[dict]:
-        """Flat rows (one per population) for CSV / a report -- factors never hidden."""
+        """Flat rows (one per population) for CSV / a report; all factors visible."""
         return [
             {"gene": self.gene, "variant": self.variant, "disease": self.disease, **ps.to_dict()}
             for ps in self.per_population.values()
@@ -110,10 +103,9 @@ def score_target(
 ) -> TargetScore:
     """Combine factors into per-population effective-N, enforcing the join guard.
 
-    ``antigen_fraction`` is treated as population-agnostic (its source cohort is in
-    its provenance). ``incidence_by_population`` and ``coverage_by_population`` are
-    keyed by population label and combined only where the *same* label appears in
-    both with a present value.
+    antigen_fraction is population-agnostic (its source cohort is in its provenance).
+    Incidence and coverage are keyed by population and combined only where the same
+    label is present in both.
     """
     warnings: list[str] = []
     inc_pops, cov_pops = set(incidence_by_population), set(coverage_by_population)

@@ -1,16 +1,11 @@
-"""Load HLA allele frequencies from an AFND-format table (a parser, not a bundler).
+"""Parse an AFND-format allele-frequency table (a parser, not a bundler).
 
-Licensing note (load-bearing): the Allele Frequency Net Database (AFND) has been
-distributed under a Creative Commons Attribution **Non-Commercial** license
-(CC BY-NC) in its primary publications. This package's code is Apache-2.0, which
-must not carry NC-licensed data inside it, so we deliberately **do not bundle or
-redistribute AFND data**. This module instead parses a frequency table that *you*
-export from AFND (or supply from another source), so the data-use terms stay
-between you and AFND. Please cite AFND: http://www.allelefrequencies.net/publications.asp
+Licensing (load-bearing): AFND is CC BY-NC; this Apache-2.0 package must not carry
+NC data, so it never bundles AFND. You export/supply the table and the data-use terms
+stay between you and AFND. Cite: http://www.allelefrequencies.net/publications.asp
 
-The parser is format-flexible: point it at a CSV/TSV and name the allele,
-population, and frequency columns. Frequencies are expected as fractions in
-``[0, 1]`` (set ``percent=True`` if your column is 0-100).
+Format-flexible CSV/TSV: name the allele/population/frequency columns. Frequencies are
+fractions in [0,1] (set percent=True for a 0-100 column).
 """
 
 from __future__ import annotations
@@ -28,13 +23,9 @@ from .provenance import Provenance, today_iso
 class FrequencyTable:
     """Allele frequencies grouped by population, plus provenance and any warnings.
 
-    ``by_population`` maps population name -> {normalized allele: frequency}. Feed
-    a single population's dict straight into :func:`pmhc_triage.hla.population_coverage`.
-
-    ``sample_sizes`` maps population -> {normalized allele: n_individuals}, populated
-    only when a sample-size column was supplied. It feeds the Monte-Carlo coverage CI
-    (chromosomes = 2 x individuals); an empty dict means coverage uncertainty can't be
-    propagated for that population (surfaced, never assumed).
+    by_population maps population -> {allele: frequency}. sample_sizes maps
+    population -> {allele: n_individuals} (populated only if a sample-size column was
+    supplied); it feeds the Monte-Carlo coverage CI, empty otherwise.
     """
 
     by_population: dict[str, dict[str, float]]
@@ -65,15 +56,10 @@ def load_afnd_frequencies(
 ) -> FrequencyTable:
     """Parse a user-supplied AFND-format frequency table.
 
-    Column names are matched case-insensitively. ``sep=None`` sniffs the delimiter.
-    Frequencies are fractions unless ``percent=True`` (then divided by 100).
-    Problems are surfaced in ``FrequencyTable.warnings`` -- nothing is silently
-    dropped or coerced.
-
-    ``sample_size_col`` (number of typed individuals per allele row) is OPTIONAL: if
-    that column is absent it is simply skipped (no error), and the resulting
-    ``sample_sizes`` is empty so Monte-Carlo coverage CIs can't be computed -- a
-    surfaced limitation, not a fabricated N.
+    Columns match case-insensitively; sep=None sniffs the delimiter; frequencies are
+    fractions unless percent=True. Problems are surfaced in FrequencyTable.warnings.
+    sample_size_col is optional: if absent it is skipped and sample_sizes stays empty
+    (so the MC coverage CI can't be computed), never a fabricated N.
     """
     path = Path(path)
     prov = Provenance(
@@ -93,7 +79,7 @@ def load_afnd_frequencies(
         return lookup[name.lower()]
 
     a_col, p_col, f_col = resolve(allele_col), resolve(population_col), resolve(freq_col)
-    # sample_size is optional: resolve it only if the caller asked AND it exists.
+    # sample_size is optional: resolve only if requested and present
     n_col = None
     if sample_size_col and sample_size_col.lower() in lookup:
         n_col = lookup[sample_size_col.lower()]

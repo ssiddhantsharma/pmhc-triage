@@ -1,22 +1,13 @@
-"""Fetch allele frequencies from AFND *on the user's machine* (never bundled).
+"""Fetch AFND allele frequencies on the user's machine (never bundled).
 
-The tool deliberately ships no AFND data (CC BY-NC; see :mod:`pmhc_triage.afnd`).
-This module lowers the setup friction without breaking that rule: it fetches the
-frequencies you need from AFND at *your* request, into a local file, so the data-use
-terms stay between you and AFND -- the tool only automates the retrieval you would
-otherwise do by hand. The output is exactly the ``--freqs`` format
-(:func:`pmhc_triage.afnd.load_afnd_frequencies` reads it), including the
-``sample_size`` column that powers the Monte-Carlo coverage CI.
+The tool ships no AFND data (CC BY-NC); this automates the retrieval you'd do by hand
+into the --freqs format, including the sample_size column for the MC coverage CI. The
+data-use terms stay between you and AFND.
 
-Robustness notes (learned the hard way):
-- AFND paginates very common alleles (e.g. ``A*02:01`` spans 500+ cohorts), so a
-  bare per-allele query can silently *miss* a target cohort. We query per
-  ``(allele, country)`` so the target cohort is always on the returned page.
-- The results-table column order is fixed: ``[1]=allele, [3]=population,
-  [5]=allele_frequency, [7]=sample_size`` (0-indexed ``<td>``). Verified against the
-  live site; parsed exactly, never guessed.
-- A requested ``(allele, population)`` with no AFND row is **surfaced** (listed in
-  warnings), never written as a fabricated 0.
+Notes: AFND paginates common alleles (A*02:01 spans 500+ cohorts), so we query per
+(allele, country) to keep the target cohort on the returned page. The results-table
+column order is fixed: [1]=allele, [3]=population, [5]=allele_frequency, [7]=sample_size.
+A requested (allele, population) with no AFND row is surfaced, never written as a 0.
 """
 
 from __future__ import annotations
@@ -58,7 +49,7 @@ DEFAULT_POPULATIONS = (
 )
 
 # A compact common class-I panel (covers the frequent A/B/C alleles behind most
-# characterized neoantigen restrictions). Not exhaustive -- pass your own list.
+# characterized neoantigen restrictions). Not exhaustive; pass your own list.
 COMMON_CLASS_I = (
     "A*01:01", "A*02:01", "A*03:01", "A*11:01", "A*24:02", "A*26:01", "A*32:01",
     "B*07:02", "B*08:01", "B*15:01", "B*35:01", "B*40:01", "B*44:02", "B*44:03",
@@ -86,7 +77,7 @@ class FetchResult:
 def parse_afnd_table(page_html: str, allele: str) -> dict[str, tuple[float, int]]:
     """Parse one AFND results page: ``{population: (allele_frequency, sample_size)}``.
 
-    Pure and hermetic -- unit-testable on a saved HTML snippet without the network.
+    Pure and hermetic: unit-testable on a saved HTML snippet without the network.
     If a population appears more than once (multiple studies), the largest-N row wins.
     """
     want = normalize_allele(allele)

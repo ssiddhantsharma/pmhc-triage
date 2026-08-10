@@ -1,20 +1,9 @@
-"""Antigen-positive fraction from cBioPortal (public mutation data; ODbL).
+"""Antigen-positive fraction from cBioPortal (live mutation data; ODbL).
 
-For a missense neoantigen (e.g. KRAS G12D), the "antigen-positive fraction" is the
-share of profiled tumors of a given type carrying that exact protein change:
-
-    numerator   = distinct sequenced samples with proteinChange == variant
-    denominator = size of the study's ``*_sequenced`` sample list
-    fraction    = numerator / denominator
-
-Computed live from the cBioPortal REST API (verified endpoints). Data is ODbL
-(attribution + share-alike); some individual studies additionally restrict
-commercial use, noted per study in cBioPortal and left to the user to check. We
-query at runtime and never bundle cBioPortal data.
-
-Note the scope boundary from the spec: this clean path is for **mutation**
-antigens. Expression antigens (e.g. PRAME) need an RNA-seq threshold and a
-different source -- out of this function; supply that fraction manually.
+For a missense neoantigen, fraction = (distinct sequenced samples carrying the exact
+proteinChange) / (size of the study's *_sequenced list). Queried live, never bundled;
+some studies additionally restrict commercial use (check per study). Mutation antigens
+only; expression antigens (e.g. PRAME) go through expression_positive_fraction.
 """
 
 from __future__ import annotations

@@ -1,18 +1,9 @@
 """Which HLA alleles present the epitope -> feeds HLA coverage.
 
-Two paths:
-
-- **manual** (default, no heavy deps): you supply the presenting alleles (e.g. from
-  the literature or IEDB). This is what lets the KRAS example run without
-  TensorFlow.
-- **MHCflurry** (optional): predict presenting alleles from candidate peptides over
-  a reference allele panel. Requires the ``presentation`` extra (pulls TensorFlow).
-  If MHCflurry isn't installed, this returns a *surfaced missing* result with an
-  install hint -- it never crashes and never silently drops to the manual path.
-
-The peptide->allele thresholding logic (:func:`select_presenting`) is a pure,
-tested function independent of MHCflurry, so the selection rule is verifiable even
-without the optional dependency installed.
+manual (default): you supply presenting alleles (literature/IEDB). MHCflurry (optional
+[presentation] extra): predict from candidate peptides over an allele panel; if not
+installed it returns a surfaced-missing result with an install hint, never crashes. The
+threshold selection rule (select_presenting) is a pure, tested function.
 """
 
 from __future__ import annotations
@@ -85,12 +76,12 @@ def sweep_presenting_alleles(
     score_col: str = "presentation_percentile",
     lower_is_better: bool = True,
 ) -> dict[float, list[str]]:
-    """Presenting-allele set at each threshold -- makes the threshold dependence visible.
+    """Presenting-allele set at each threshold, making the threshold dependence visible.
 
     The presentation threshold is a lever, not a fact: a looser cutoff admits more
     alleles and inflates HLA coverage. Rather than commit to one arbitrary point, sweep
     it. ``df`` is a scored (peptide, allele) table (e.g. MHCflurry output); returns
-    ``{threshold: [alleles]}``. Pure -- no MHCflurry needed to test the selection rule.
+    ``{threshold: [alleles]}``. Pure; no MHCflurry needed to test the selection rule.
     """
     return {
         float(t): select_presenting(

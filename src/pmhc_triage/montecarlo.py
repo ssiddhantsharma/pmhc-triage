@@ -1,27 +1,12 @@
-"""Monte-Carlo uncertainty propagation for effective addressable-N.
+"""Monte-Carlo interval on effective_N, propagating the two sourceable factors:
 
-The point estimate ``effective_N = incidence x antigen_fraction x hla_coverage`` is
-only as trustworthy as its softest factor, and the shipped CI historically covered
-*only* the antigen-fraction sampling error. This module propagates the two factors
-whose sampling uncertainty is genuinely sourceable into a real interval on
-``effective_N``:
+- antigen fraction: Jeffreys Beta(numer+0.5, denom-numer+0.5) from the cBioPortal cohort.
+- HLA coverage: each covering allele's frequency drawn from its own Beta posterior using
+  the AFND sample size (chromosomes = 2 x individuals); coverage recomputed per draw
+  with the Bui-2006 diploid formula.
 
-- **antigen fraction** -- a binomial proportion ``numer/denom`` from a cBioPortal
-  cohort. Sampled from a Jeffreys ``Beta(numer + 1/2, denom - numer + 1/2)``.
-- **HLA coverage** -- a nonlinear function of per-allele frequencies, each estimated
-  from a finite AFND sample. Each covering allele's frequency is sampled from its own
-  ``Beta`` posterior using the AFND sample size (2 x individuals = chromosomes typed),
-  then coverage is recomputed per draw with the exact Bui-2006 diploid formula.
-
-**Incidence is held fixed by default and said so.** GLOBOCAN publishes point
-estimates without a CI, so inventing one would violate the tool's contract. The
-caller may pass ``incidence_rel_sd`` to inject a *user-owned* relative uncertainty
-(e.g. ``0.15`` for +/-15%); otherwise the returned interval explicitly reflects
-antigen + coverage sampling only, and the ``method``/``caveats`` say so.
-
-Reproducibility: everything is driven by a seeded ``numpy`` generator (default seed
-0), so an MC interval replays byte-identically -- consistent with the rest of the
-package treating numbers as sourced and reproducible, not stochastic surprises.
+Incidence is held fixed unless the caller passes incidence_rel_sd (a user-owned
+assumption), since GLOBOCAN publishes no CI. Seeded numpy generator -> replays identically.
 """
 
 from __future__ import annotations
@@ -33,8 +18,7 @@ import numpy as np
 
 from .hla import normalize_allele, parse_locus
 
-# Jeffreys prior pseudo-counts -- a proper, well-behaved posterior at 0/1 and small n.
-_JEFFREYS = 0.5
+_JEFFREYS = 0.5  # Jeffreys prior pseudo-count
 
 
 @dataclass
@@ -47,7 +31,7 @@ class MCResult:
     n_draws: int
     method: str
     caveats: list[str] = field(default_factory=list)
-    # component draws' summaries, for auditing which factor dominates the spread
+    # per-factor draw summaries, for auditing which factor dominates the spread
     components: dict = field(default_factory=dict)
 
     @property
@@ -101,7 +85,7 @@ def sample_coverage(
     -------
     (draws, warnings)
         ``draws`` is an ``(n_draws,)`` array of coverage in ``[0, 1]``. Empty (size 0)
-        with a warning if no covering allele has a known frequency -- mirroring the
+        with a warning if no covering allele has a known frequency; as in the
         point-estimate module, a missing frequency is never treated as 0.
     """
     norm_freqs: dict[str, float] = {}
@@ -111,11 +95,10 @@ def sample_coverage(
         except (TypeError, ValueError):
             pass
     norm_n = {normalize_allele(k): v for k, v in (sample_sizes or {}).items()}
-    # De-duplicate (order-preserving): an allele listed twice must not double-count.
-    covering = list(dict.fromkeys(normalize_allele(a) for a in covering_alleles))
+    covering = list(dict.fromkeys(normalize_allele(a) for a in covering_alleles))  # de-dup
     warnings: list[str] = []
 
-    # Per-locus list of (n_draws,) frequency-sample arrays for covering alleles present.
+    # per locus, a list of (n_draws,) frequency-sample arrays for its covering alleles
     per_locus: dict[str, list[np.ndarray]] = {}
     fixed_no_n: list[str] = []
     missing: list[str] = []
@@ -126,11 +109,11 @@ def sample_coverage(
         try:
             locus = parse_locus(allele)
         except ValueError:
-            missing.append(allele)  # malformed -> excluded + surfaced, never crash
+            missing.append(allele)
             continue
         p_hat = norm_freqs[allele]
         if not math.isfinite(p_hat) or p_hat < 0.0 or p_hat > 1.0:
-            missing.append(allele)  # NaN/inf/out-of-range -> excluded, never sampled
+            missing.append(allele)  # exclude NaN/inf/out-of-range
             continue
         n_ind = norm_n.get(allele)
         if n_ind and n_ind > 0:
@@ -138,8 +121,7 @@ def sample_coverage(
             k = p_hat * two_n
             draws = rng.beta(k + _JEFFREYS, (two_n - k) + _JEFFREYS, size=n_draws)
         else:
-            # No sample size -> can't put a CI on this allele; hold it fixed and say so.
-            draws = np.full(n_draws, p_hat)
+            draws = np.full(n_draws, p_hat)  # no sample size -> hold fixed (no CI here)
             fixed_no_n.append(allele)
         per_locus.setdefault(locus, []).append(draws)
 
@@ -197,9 +179,9 @@ def effective_n_interval(
 
     Propagates antigen-fraction (Beta) and HLA-coverage (per-allele Beta) sampling
     error. Incidence is fixed unless ``incidence_rel_sd`` is given, in which case it
-    is drawn from a truncated-at-0 normal with that relative SD -- a *user-owned*
-    assumption, flagged in the caveats. Returns a surfaced non-computable ``MCResult``
-    (median ``None``) if coverage cannot be sampled, never a fabricated interval.
+    is drawn from a truncated-at-0 normal with that relative SD (a user-owned
+    assumption, flagged in the caveats). Returns a surfaced non-computable MCResult
+    (median None) if coverage cannot be sampled, never a fabricated interval.
     """
     rng = np.random.default_rng(seed)
     caveats: list[str] = []

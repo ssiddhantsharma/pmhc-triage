@@ -1,15 +1,9 @@
 """Threshold-sensitivity report: how coverage / effective-N move with the cutoff.
 
-The presentation threshold (which alleles count as "presenting") is the single most
-arbitrary knob in the pipeline -- a looser cutoff admits more alleles and mechanically
-inflates HLA coverage and therefore effective-N. The tool's contract is to *surface*
-levers, not bury them in a single default. This module turns a threshold sweep into a
-small table so the reader sees the whole curve and picks a defensible point themselves.
-
-Given a scored (peptide, allele) table and a set of thresholds, it reports, per
-threshold: the presenting-allele set and the resulting per-population HLA coverage
-(via the same Bui-2006 diploid method as everywhere else). Optionally multiplies
-through a fixed ``incidence x antigen_fraction`` to show effective-N sensitivity.
+The presentation threshold is the most arbitrary knob (a looser cutoff admits more
+alleles and inflates coverage), so this sweeps it into a table rather than committing
+to one default. Per threshold it reports the presenting-allele set and per-population
+coverage (same Bui-2006 method), plus effective-N if incidence x antigen is supplied.
 """
 
 from __future__ import annotations

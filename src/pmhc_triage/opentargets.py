@@ -1,17 +1,11 @@
-"""Thin Open Targets GraphQL client -- consumed as CONTEXT, never a fork.
+"""Thin Open Targets GraphQL client (data CC0), used as context only.
 
-Guardrail: pmhc-triage does **not** reimplement Open Targets' association / L2G
-engine. It calls the public GraphQL API (data is CC0) for two things that feed
-*around* the pMHC/HLA spine:
+Calls the public API for two things around the pMHC spine:
+- tractability: small-molecule / antibody druggability buckets. Context only, the
+  wrong modality for pMHC; must never drive the addressable-N score.
+- associated_targets: top targets for a disease, for the optional discover command.
 
-- ``tractability`` -- small-molecule / antibody druggability buckets. **Context
-  only**: it is the wrong modality for pMHC and must never drive the addressable-N
-  score.
-- ``associated_targets`` -- top targets for a disease, powering the optional
-  ``discovery`` front-end that proposes candidate genes to run through the pipeline.
-
-Endpoint verified live: https://api.platform.opentargets.org/api/v4/graphql
-Citing Open Targets is courtesy (CC0).
+Endpoint: https://api.platform.opentargets.org/api/v4/graphql
 """
 
 from __future__ import annotations
@@ -96,7 +90,7 @@ def resolve_disease(name: str, *, client: httpx.Client | None = None, timeout: f
 
 
 def tractability(ensembl_id: str, *, client: httpx.Client | None = None, timeout: float = 30.0) -> Sourced[list[dict]]:
-    """Tractability buckets for a target. CONTEXT ONLY -- never a pMHC-score driver."""
+    """Tractability buckets for a target. Context only; never a pMHC-score driver."""
     prov = Provenance(
         source=_SOURCE,
         url=ENDPOINT,
@@ -120,7 +114,7 @@ def associated_targets(
     client: httpx.Client | None = None,
     timeout: float = 30.0,
 ) -> Sourced[list[dict]]:
-    """Top associated targets for a disease -- the discovery front-end (chained, not cloned).
+    """Top associated targets for a disease; powers the discover command (chained, not cloned).
 
     Returns rows of ``{ensembl_id, symbol, association_score}``. This is Open
     Targets' association scoring, consumed verbatim; pmhc-triage does not recompute it.

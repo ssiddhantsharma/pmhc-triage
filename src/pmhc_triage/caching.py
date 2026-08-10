@@ -1,13 +1,8 @@
 """On-disk HTTP cache for reproducible, offline re-runs.
 
-Every remote factor is fetched through httpx clients that accept an injected
-transport. ``cached_client(dir)`` returns a client whose responses are cached to
-disk keyed by (method, URL, request body), each stamped with the UTC datetime it
-was fetched. A re-run served from cache returns byte-identical responses -- so a
-provenance run reproduces exactly, and works with the network unplugged.
-
-Cache entries carry ``x-pmhc-cache: HIT|MISS`` and ``x-pmhc-fetched-at`` response
-headers so a caller can tell fresh from replayed data.
+cached_client(dir) caches responses keyed by (method, URL, body), each stamped with
+its fetch datetime, and replays them byte-identically (so a run reproduces offline).
+Entries carry x-pmhc-cache: HIT|MISS and x-pmhc-fetched-at headers.
 """
 
 from __future__ import annotations
