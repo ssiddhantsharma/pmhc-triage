@@ -56,12 +56,12 @@ def test_parse_ignores_other_alleles_and_bad_rows():
 
 
 class _FakeClient:
-    """Returns a page per (allele, country) from a lookup; mimics httpx.Client.get."""
+    """Returns a page per (allele, country) from a lookup; mimics httpx.Client.request."""
 
     def __init__(self, pages):
         self.pages = pages
 
-    def get(self, url, headers=None, timeout=None):
+    def request(self, method, url, headers=None, timeout=None, **kwargs):
         # crude allele+country extraction from the query string
         import urllib.parse
         q = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)

@@ -15,6 +15,8 @@ from pathlib import Path
 
 import httpx
 
+from .http import _RETRYABLE_STATUS
+
 
 def _fetched_at() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -60,15 +62,17 @@ class CachingTransport(httpx.BaseTransport):
         body = resp.read()
         fetched_at = _fetched_at()
         stored_headers = self._replay_headers(dict(resp.headers))
-        rec = {
-            "method": request.method,
-            "url": str(request.url),
-            "status": resp.status_code,
-            "content_b64": base64.b64encode(body).decode(),
-            "headers": stored_headers,
-            "fetched_at": fetched_at,
-        }
-        path.write_text(json.dumps(rec))
+        # don't cache transient errors (429/5xx): a re-run/retry should re-fetch them
+        if resp.status_code not in _RETRYABLE_STATUS:
+            rec = {
+                "method": request.method,
+                "url": str(request.url),
+                "status": resp.status_code,
+                "content_b64": base64.b64encode(body).decode(),
+                "headers": stored_headers,
+                "fetched_at": fetched_at,
+            }
+            path.write_text(json.dumps(rec))
         headers = {**stored_headers, "x-pmhc-cache": "MISS", "x-pmhc-fetched-at": fetched_at}
         return httpx.Response(resp.status_code, content=body, headers=headers, request=request)
 

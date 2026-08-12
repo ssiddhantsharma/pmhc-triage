@@ -12,6 +12,7 @@ from dataclasses import replace
 
 import httpx
 
+from .http import request_with_retry
 from .provenance import Provenance, Sourced, fetched_at_or_today, today_iso
 from .uncertainty import wilson_ci
 
@@ -23,7 +24,8 @@ def _request(method, url, client, timeout, *, json=None):
     owns = client is None
     client = client or httpx.Client(timeout=timeout)
     try:
-        resp = client.request(method, url, json=json, headers={"Accept": "application/json"})
+        resp = request_with_retry(client, method, url, json=json,
+                                  headers={"Accept": "application/json"}, timeout=timeout)
     except httpx.HTTPError as exc:
         return None, f"cBioPortal request failed: {exc}", None
     finally:

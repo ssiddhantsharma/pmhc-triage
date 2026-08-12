@@ -14,6 +14,7 @@ from dataclasses import replace
 
 import httpx
 
+from .http import request_with_retry
 from .provenance import Provenance, Sourced, fetched_at_or_today, today_iso
 
 ENDPOINT = "https://api.platform.opentargets.org/api/v4/graphql"
@@ -30,7 +31,8 @@ def _post(
     owns = client is None
     client = client or httpx.Client(timeout=timeout)
     try:
-        resp = client.post(ENDPOINT, json={"query": query, "variables": variables})
+        resp = request_with_retry(client, "POST", ENDPOINT,
+                                  json={"query": query, "variables": variables}, timeout=timeout)
     except httpx.HTTPError as exc:
         return None, f"request to Open Targets failed: {exc}", None
     finally:

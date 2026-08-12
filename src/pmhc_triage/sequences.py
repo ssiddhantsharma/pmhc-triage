@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import httpx
 
+from .http import request_with_retry
 from .provenance import Provenance, Sourced, fetched_at_or_today, today_iso
 
 UNIPROT_FASTA = "https://rest.uniprot.org/uniprotkb/{accession}.fasta"
@@ -38,7 +39,7 @@ def fetch_uniprot_sequence(
     owns_client = client is None
     client = client or httpx.Client(timeout=timeout, follow_redirects=True)
     try:
-        resp = client.get(url)
+        resp = request_with_retry(client, "GET", url, timeout=timeout)
     except httpx.HTTPError as exc:
         return Sourced(None, prov).warn(f"request to UniProt failed: {exc}")
     finally:

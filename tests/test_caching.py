@@ -98,3 +98,18 @@ def test_provenance_query_date_is_fetch_time_not_rerun_time(tmp_path):
     # both stamped from the cache's fetched_at (full ISO w/ 'T'), and identical
     assert "T" in s1.provenance.query_date  # a real fetch timestamp, not a bare re-run date
     assert s1.provenance.query_date == s2.provenance.query_date
+
+
+def test_caching_does_not_store_transient_errors(tmp_path):
+    # a 503 must NOT be cached, so a retry/re-run re-fetches (and can get a 200)
+    import httpx
+    from pmhc_triage.caching import CachingTransport
+    calls = {"n": 0}
+    def inner(request):
+        calls["n"] += 1
+        return httpx.Response(503 if calls["n"] == 1 else 200, text="x")
+    client = httpx.Client(transport=CachingTransport(tmp_path, inner=httpx.MockTransport(inner)))
+    r1 = client.get("http://x/y")
+    r2 = client.get("http://x/y")
+    assert r1.status_code == 503 and r2.status_code == 200
+    assert calls["n"] == 2  # 503 was re-fetched, not served from cache

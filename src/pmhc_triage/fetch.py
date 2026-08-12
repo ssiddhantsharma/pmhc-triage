@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 import httpx
 
 from .hla import normalize_allele
+from .http import request_with_retry
 from .provenance import today_iso
 
 _AFND_URL = "http://www.allelefrequencies.net/hla6006a.asp"
@@ -108,7 +109,8 @@ def _fetch_page(allele: str, country: str, client: httpx.Client, timeout: float)
     params = {"hla_locus_type": "Classical", "hla_allele1": allele, "hla_country": country}
     url = f"{_AFND_URL}?{urllib.parse.urlencode(params)}"
     try:
-        r = client.get(url, headers={"User-Agent": "Mozilla/5.0 pmhc-triage"}, timeout=timeout)
+        r = request_with_retry(client, "GET", url,
+                               headers={"User-Agent": "Mozilla/5.0 pmhc-triage"}, timeout=timeout)
     except httpx.HTTPError:
         return None
     return r.text if r.status_code == 200 else None
