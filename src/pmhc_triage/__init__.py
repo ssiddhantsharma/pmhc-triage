@@ -11,6 +11,15 @@ from .antigen import (
 )
 from .burden import bundled_diseases, load_bundled, load_burden_table, manual_incidence
 from .caching import cached_client
+from .crossreact import (
+    Agent,
+    SelfHit,
+    antigen_safety,
+    load_agents,
+    scan_sourced,
+    self_scan,
+    tcr_contact_positions,
+)
 from .fetch import (
     COMMON_CLASS_I,
     DEFAULT_POPULATIONS,
@@ -117,5 +126,12 @@ __all__ = [
     "suggest_match",
     "align_populations",
     "cached_client",
+    "tcr_contact_positions",
+    "self_scan",
+    "scan_sourced",
+    "antigen_safety",
+    "load_agents",
+    "SelfHit",
+    "Agent",
     "__version__",
 ]

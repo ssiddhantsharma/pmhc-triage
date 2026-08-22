@@ -1,0 +1,20 @@
+# Curated clinical pMHC-directed agents and the landmark TCR cross-reactivity incidents.
+# Verified against primary sources; peptides are the targeted epitope.
+
+agents:
+  - {name: tebentafusp (IMCgp100), antigen: gp100/PMEL, peptide: YLEPGPVTV, allele: "A*02:01",
+     modality: ImmTAC bispecific, status: approved (uveal melanoma),
+     note: "first approved TCR-based bispecific; AACR 2020"}
+  - {name: afamitresgene autoleucel (afami-cel), antigen: MAGE-A4, peptide: GVYDGREHTV, allele: "A*02:01",
+     modality: TCR-T, status: approved (synovial sarcoma 2024),
+     note: "MAGE-A4 230-239; Nat Med 2022 s41591-022-02128-z"}
+  - {name: letetresgene autoleucel (lete-cel), antigen: NY-ESO-1/LAGE-1a, peptide: SLLMWITQC, allele: "A*02:01",
+     modality: TCR-T, status: phase 2, note: "NY-ESO-1 157-165"}
+
+incidents:
+  - {name: MAGE-A3 a3a (affinity-enhanced TCR), antigen: MAGE-A3, peptide: EVDPIGHLY, allele: "A*01:01",
+     modality: affinity-enhanced TCR-T, status: halted (2 deaths),
+     note: "cross-reacts with titin ESDPIVAQY -> fatal cardiotoxicity (Cameron, Sci Transl Med 2013, PMC6002776)"}
+  - {name: MAGE-A3 (A*02:01 TCR), antigen: MAGE-A3, peptide: KVAELVHFL, allele: "A*02:01",
+     modality: affinity-enhanced TCR-T, status: halted (2 deaths),
+     note: "cross-reacts with MAGE-A12 in brain -> fatal neurotoxicity (Morgan, J Immunother 2013)"}

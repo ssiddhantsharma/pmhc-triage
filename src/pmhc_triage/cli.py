@@ -105,7 +105,8 @@ def build_parser() -> argparse.ArgumentParser:
         description="HLA-coverage-adjusted effective addressable-population "
         "estimates for pMHC / T-cell immunotherapy targets.",
     )
-    sub = p.add_subparsers(dest="command", metavar="{score,discover,validate,run,fetch-freqs}")
+    sub = p.add_subparsers(dest="command",
+                           metavar="{score,discover,validate,run,fetch-freqs,crossreact}")
 
     s = sub.add_parser("score", help="score one target from flags")
     _add_score_args(s)
@@ -135,6 +136,23 @@ def build_parser() -> argparse.ArgumentParser:
     ff.add_argument("--alleles", default="",
                     help="comma-separated alleles (default: a common class-I panel)")
     ff.add_argument("--out", default="freqs.tsv")
+
+    cr = sub.add_parser(
+        "crossreact",
+        help="self cross-reactivity / safety axis for a target epitope: recognition motif, "
+        "neoantigen-vs-self, curated agents/landmines, and an opt-in proteome self-scan",
+    )
+    cr.add_argument("--peptide", required=True, help="target epitope, e.g. EVDPIGHLY")
+    cr.add_argument("--allele", required=True, help="restricting HLA, e.g. A*01:01")
+    cr.add_argument("--antigen-mode", dest="antigen_mode", choices=["mutation", "expression"],
+                    default="mutation", help="mutation (neoantigen) or expression (shared self)")
+    cr.add_argument("--antigen", default="", help="filter curated agents/incidents to this antigen")
+    cr.add_argument("--proteome", default=None,
+                    help="opt-in: UniProt FASTA to self-scan for near-self mimics (default off, keeps run fast)")
+    cr.add_argument("--max-mismatch", dest="max_mismatch", type=int, default=3,
+                    help="max mismatches at TCR-contact positions for a self hit (default 3)")
+    cr.add_argument("--exclude", default="", help="comma-separated accessions to skip (the target itself)")
+    cr.add_argument("--top", type=int, default=20, help="max self hits to list")
 
     return p
 
@@ -248,6 +266,22 @@ def _cmd_run(a: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_crossreact(a: argparse.Namespace) -> int:
+    from . import crossreact as cr
+    from .render import render_crossreact
+
+    pep, allele = a.peptide.strip().upper(), a.allele.strip()
+    contact = cr.tcr_contact_positions(len(pep), allele)
+    safety = cr.antigen_safety(a.antigen_mode)
+    agents, incidents = cr.load_agents(a.antigen)
+    scanned = None
+    if a.proteome:
+        scanned = cr.scan_sourced(pep, allele, a.proteome, max_mismatch=a.max_mismatch,
+                                  exclude=_csv_list(a.exclude))
+    render_crossreact(pep, allele, contact, safety, agents, incidents, scanned, top=a.top)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if not args.command:
@@ -259,6 +293,7 @@ def main(argv: list[str] | None = None) -> int:
         "discover": _cmd_discover,
         "run": _cmd_run,
         "fetch-freqs": _cmd_fetch_freqs,
+        "crossreact": _cmd_crossreact,
     }
     return handlers[args.command](args)
 
