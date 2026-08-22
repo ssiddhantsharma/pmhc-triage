@@ -110,7 +110,7 @@ def test_cli_crossreact_runs(capsys, tmp_path):
                    "--proteome", str(fa), "--max-mismatch", "0"])
     assert rc == 0
     out = capsys.readouterr().out
-    assert "MAGEA12" in out and "recognition motif" in out
+    assert "MAGEA12" in out and "Recognition motif" in out
 
 
 def test_cli_crossreact_without_proteome(capsys):

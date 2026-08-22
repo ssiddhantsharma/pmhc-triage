@@ -108,6 +108,17 @@ def render_rank(scores, console: Console | None = None) -> None:
                        style="dim"))
 
 
+def _agent_table(items, *, header):
+    t = Table(box=None, pad_edge=False, title_style="bold", header_style=f"bold {header}")
+    for c in ("name", "antigen", "peptide", "allele", "modality/status", "note"):
+        t.add_column(c)
+    for a in items:
+        t.add_row(Text(a.name, style="bold"), Text(a.antigen, style="cyan"),
+                  Text(a.peptide, style="bold magenta"), Text(a.allele, style="green"),
+                  f"{a.modality} / {a.status}", Text(a.note, style="dim"))
+    return t
+
+
 def render_crossreact(peptide, allele, contact, safety, agents, incidents, scanned,
                       *, top=20, console=None):
     console = console or Console()
@@ -115,51 +126,57 @@ def render_crossreact(peptide, allele, contact, safety, agents, incidents, scann
     anchors = [i for i in range(L) if i not in contact]
     motif = Text()
     for i, c in enumerate(peptide):
-        motif.append(c, style="dim" if i in anchors else "bold cyan")
-    body = [
-        Text.assemble(("peptide ", "bold"), (peptide, "bold white"), ("  on  ", "dim"),
-                      (allele, "bold white"), (f"   ({L}-mer)", "dim")),
-        Text.assemble(("recognition motif  ", "bold"), motif,
-                      (f"   anchors P{','.join(str(i + 1) for i in anchors)} (buried); "
-                       "TCR-contact in bold", "dim")),
-    ]
+        motif.append(c, style="dim yellow" if i in anchors else "bold bright_cyan")
     label, note = safety
-    body.append(Text.assemble(("antigen  ", "bold"), (label, "yellow"), (f"  {note}", "dim")))
+    safe_color = "green" if label == "neoantigen" else "yellow"
+    head = Group(
+        Text.assemble(("peptide  ", "bold"), (peptide, "bold bright_white"), ("  on  ", "dim"),
+                      (allele, "bold bright_white"), (f"   ({L}-mer)", "dim")),
+        Text.assemble(("motif    ", "bold"), motif,
+                      (f"   anchors P{','.join(str(i + 1) for i in anchors)} ", "dim yellow"),
+                      ("(buried); ", "dim"), ("TCR-contact", "bold bright_cyan"),
+                      (" is what a binder reads", "dim")),
+        Text.assemble(("antigen  ", "bold"), (label, f"bold {safe_color}"), (f"  {note}", "dim")),
+    )
+    console.print(Panel(head, title="[bold]Recognition motif / safety[/]",
+                        title_align="left", border_style="cyan"))
 
     if scanned is None:
-        body.append(Text("self-scan  run with --proteome <human.fasta> to flag near-self mimics",
-                         style="dim"))
+        console.print(Panel(
+            Text("run with --proteome <human.fasta> to flag near-self mimics", style="dim"),
+            title="[bold]Proteome self-scan[/]", title_align="left", border_style="blue"))
     elif scanned.is_missing:
-        body.append(Text(f"self-scan unavailable: {'; '.join(scanned.warnings)}", style="red"))
+        console.print(Panel(Text('; '.join(scanned.warnings), style="red"),
+                            title="[bold]Proteome self-scan[/]", title_align="left",
+                            border_style="red"))
     else:
         hits = scanned.value
-        body.append(Text.assemble(
-            ("self-scan  ", "bold"),
-            (f"{len(hits)} self peptide(s) within threshold", "red" if hits else "green"),
-            (f"   [{scanned.provenance.method}]", "dim")))
+        body = [Text.assemble(
+            (f"{len(hits)} self peptide(s) within threshold  ", "bold red" if hits else "bold green"),
+            (f"[{scanned.provenance.method}]", "dim"))]
         if hits:
-            t = Table(box=None, pad_edge=False)
+            t = Table(box=None, pad_edge=False, header_style="bold red")
             for c in ("protein", "pos", "peptide", "mism"):
                 t.add_column(c)
             for h in hits[:top]:
-                t.add_row(h.accession, str(h.position), h.peptide, str(h.mismatches))
+                mc = "bold red" if h.mismatches <= 1 else ("yellow" if h.mismatches == 2 else "dim")
+                t.add_row(Text(h.accession, style="cyan"), str(h.position),
+                          Text(h.peptide, style="bold magenta"),
+                          Text(str(h.mismatches), style=mc))
             body.append(t)
             if len(hits) > top:
-                body.append(Text(f"  ... +{len(hits) - top} more", style="dim"))
-        body.append(Text("  coarse near-self screen; blind to distant mimicry "
+                body.append(Text(f"... +{len(hits) - top} more", style="dim"))
+        body.append(Text("coarse near-self screen; blind to distant mimicry "
                          "(MAGE-A3/titin differ at 4 contacts) -- no hit is not safety",
                          style="dim italic"))
+        console.print(Panel(Group(*body), title="[bold]Proteome self-scan[/]",
+                            title_align="left", border_style="red" if hits else "green"))
 
-    for title, items in (("clinical agents", agents),
-                         ("cross-reactivity incidents (landmines)", incidents)):
-        if items:
-            t = Table(box=None, pad_edge=False, title=title, title_style="bold", title_justify="left")
-            for c in ("name", "antigen", "peptide", "allele", "modality/status", "note"):
-                t.add_column(c)
-            for a in items:
-                t.add_row(a.name, a.antigen, a.peptide, a.allele,
-                          f"{a.modality} / {a.status}", Text(a.note, style="dim"))
-            body.append(t)
-
-    console.print(Panel(Group(*body), title="[bold]Cross-reactivity / self-safety[/]",
-                        title_align="left", border_style="red"))
+    if agents:
+        console.print(Panel(_agent_table(agents, header="green"),
+                            title="[bold green]Clinical agents[/]", title_align="left",
+                            border_style="green"))
+    if incidents:
+        console.print(Panel(_agent_table(incidents, header="red"),
+                            title="[bold red]Cross-reactivity incidents (landmines)[/]",
+                            title_align="left", border_style="red"))
