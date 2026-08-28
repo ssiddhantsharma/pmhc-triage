@@ -52,7 +52,7 @@ pmhc-triage crossreact --peptide KVAELVHFL --allele "A*02:01" --proteome UP00000
 
 ![pmhc-triage crossreact output](docs/crossreact.svg)
 
-The self-scan (`--proteome`, any UniProt FASTA) flags self peptides matching the target at its TCR-contact positions. It catches **close** mimics: MAGE-A12 `KMAELVHFL` differs from MAGE-A3 `KVAELVHFL` only at the P2 anchor, so its contact face is identical and it flags at zero mismatch. It is **blind** to distant structural mimicry: the fatal MAGE-A3 `EVDPIGHLY` / cardiac-titin `ESDPIVAQY` pair differs at 4 contact positions, so no sane Hamming threshold catches it. **Absence of a hit is not a safety guarantee**, which is why the curated incident list ships and experimental screening stays mandatory.
+The self-scan (`--proteome`, any UniProt FASTA) flags self peptides matching the target at its TCR-contact positions. It catches **close** mimics (MAGE-A12 vs MAGE-A3 differ only at the P2 anchor, so the contact face is identical and flags at zero mismatch) but is **blind** to distant structural mimicry (the fatal MAGE-A3 / cardiac-titin pair differs at 4 contact positions, past any sane Hamming threshold). **Absence of a hit is not a safety guarantee**: the curated incident list ships and experimental screening stays mandatory.
 
 ## Design principles
 
