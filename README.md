@@ -54,6 +54,20 @@ pmhc-triage crossreact --peptide KVAELVHFL --allele "A*02:01" --proteome UP00000
 
 ![pmhc-triage crossreact output](docs/crossreact.svg)
 
+### Is the mimic actually displayed on healthy tissue?
+
+A proteome self-scan asks whether a near-self mimic *exists* in the translated proteome. Most of the proteome is never processed and presented, so existence is weak evidence. `--benign-ligands` asks the stronger question: was the mimic actually eluted from benign human tissue?
+
+```bash
+pmhc-triage fetch-ligands --out benign-ligands.tsv          # HLA Ligand Atlas, CC BY 4.0, ~12 MB
+pmhc-triage crossreact --peptide KVAELVHFL --allele "A*02:01" --antigen MAGE-A3 \
+  --benign-ligands benign-ligands.tsv
+```
+
+This scans 80,621 class-I peptides measured by mass spectrometry across 29 benign tissues ([HLA Ligand Atlas](https://hla-ligand-atlas.org), Marcu et al. 2021), keeping those that match the target at its TCR-contact positions. On the MAGE-A3 epitope it returns `SLAELVHAV` at two mismatches, a predicted strong A\*02:01 binder observed in adrenal gland, aorta and bladder: a proteome scan can only say such a peptide exists, not that it is displayed on healthy aorta.
+
+Two limits are reported rather than papered over. The peptide was **measured**; the per-allele call is a **prediction** attached to the donor's genotype, not a measured deconvolution. And the release README states that a tissue-to-allele pairing cannot be deduced from the aggregated table, so tissue and allele are shown as separate facts. Same-length peptides only, so this inherits the scan's blind spot for distant structural mimicry.
+
 Add `--presentation` to annotate each self hit with whether the allele is predicted (MHCflurry) to actually display it: a contact-face match the allele cannot present is a false positive. It annotates and never filters, because a prediction is not strong enough evidence to delete a flagged self peptide, and "unavailable" is recorded as unknown rather than as "not presented".
 
 The self-scan (`--proteome`, any UniProt FASTA) flags self peptides matching the target at its TCR-contact positions. It catches **close** mimics (MAGE-A12 vs MAGE-A3 differ only at the P2 anchor, so the contact face is identical and flags at zero mismatch) but is **blind** to distant structural mimicry (the fatal MAGE-A3 / cardiac-titin pair differs at 4 contact positions, past any sane Hamming threshold). **Absence of a hit is not a safety guarantee**: the curated incident list ships and experimental screening stays mandatory.

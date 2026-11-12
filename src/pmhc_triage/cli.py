@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 
 from .caching import cached_client
+from .ligandatlas import RELEASE as ATLAS_RELEASE
 from .opentargets import associated_targets, resolve_disease
 from .pipeline import TargetSpec, preflight, run_target
 from .report import write_provenance_json, write_results_csv
@@ -137,6 +138,14 @@ def build_parser() -> argparse.ArgumentParser:
                     help="comma-separated alleles (default: a common class-I panel)")
     ff.add_argument("--out", default="freqs.tsv")
 
+    fl = sub.add_parser(
+        "fetch-ligands",
+        help="fetch the HLA Ligand Atlas benign-tissue immunopeptidome to a local file "
+        "(NOT bundled; CC-BY 4.0, cite Marcu et al. 2021)",
+    )
+    fl.add_argument("--out", default="benign-ligands.tsv")
+    fl.add_argument("--release", default=ATLAS_RELEASE)
+
     cr = sub.add_parser(
         "crossreact",
         help="self cross-reactivity / safety axis for a target epitope: recognition motif, "
@@ -151,6 +160,13 @@ def build_parser() -> argparse.ArgumentParser:
                     help="opt-in: UniProt FASTA to self-scan for near-self mimics (default off, keeps run fast)")
     cr.add_argument("--max-mismatch", dest="max_mismatch", type=int, default=3,
                     help="max mismatches at TCR-contact positions for a self hit (default 3)")
+    cr.add_argument("--benign-ligands", dest="benign_ligands", default=None,
+                    help="opt-in: local HLA Ligand Atlas table (see `fetch-ligands`) to scan for "
+                         "mimics actually eluted from benign tissue, not merely present in the "
+                         "proteome")
+    cr.add_argument("--all-benign", dest="all_benign", action="store_true",
+                    help="with --benign-ligands, keep same-length matches that are NOT predicted "
+                         "binders of the allele (default keeps predicted binders only)")
     cr.add_argument("--presentation", action="store_true",
                     help="annotate self hits with whether the allele is predicted to present "
                          "them (needs MHCflurry; annotates, never drops a hit)")
@@ -279,6 +295,22 @@ def _cmd_run(a: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_fetch_ligands(a: argparse.Namespace) -> int:
+    from .ligandatlas import fetch_atlas
+    print("Fetching the HLA Ligand Atlas (CC-BY 4.0). Cite Marcu et al., J Immunother Cancer "
+          "9:e002071 (2021). ~12 MB download...")
+    try:
+        n = fetch_atlas(a.out, release=a.release)
+    except Exception as exc:
+        print(f"! could not fetch the ligand atlas: {exc}")
+        return 1
+    if not n:
+        print(f"! 0 HLA-I peptides parsed from release {a.release}; not writing a usable table")
+        return 1
+    print(f"wrote {n:,} benign HLA-I ligands -> {a.out}  [release {a.release}]")
+    return 0
+
+
 def _cmd_crossreact(a: argparse.Namespace) -> int:
     from . import crossreact as cr
     from .render import render_crossreact
@@ -288,6 +320,7 @@ def _cmd_crossreact(a: argparse.Namespace) -> int:
     safety = cr.antigen_safety(a.antigen_mode)
     agents, incidents = cr.load_agents(a.antigen)
     scanned = None
+    benign = None
     if a.proteome:
         scanned = cr.scan_sourced(pep, allele, a.proteome, max_mismatch=a.max_mismatch,
                                   exclude=_csv_list(a.exclude))
@@ -295,7 +328,14 @@ def _cmd_crossreact(a: argparse.Namespace) -> int:
             ann = cr.annotate_presentation(scanned.value, allele)
             for w in ann.warnings:
                 print(f"  ! presentation: {w}")
-    render_crossreact(pep, allele, contact, safety, agents, incidents, scanned, top=a.top)
+    # independent of --proteome: the benign atlas is its own evidence source, not a filter on
+    # the proteome scan
+    if a.benign_ligands:
+        benign = cr.benign_sourced(pep, allele, a.benign_ligands,
+                                   max_mismatch=a.max_mismatch,
+                                   require_binding=not a.all_benign)
+    render_crossreact(pep, allele, contact, safety, agents, incidents, scanned, top=a.top,
+                      benign=benign)
     return 0
 
 
@@ -310,6 +350,7 @@ def main(argv: list[str] | None = None) -> int:
         "discover": _cmd_discover,
         "run": _cmd_run,
         "fetch-freqs": _cmd_fetch_freqs,
+        "fetch-ligands": _cmd_fetch_ligands,
         "crossreact": _cmd_crossreact,
     }
     return handlers[args.command](args)

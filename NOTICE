@@ -24,6 +24,13 @@ NOT bundled (fetched or supplied at the user's request)
 - HLA allele frequencies: Allele Frequency Net Database (AFND), CC BY-NC.
   http://www.allelefrequencies.net  — deliberately NOT redistributed. `pmhc-triage
   fetch-freqs` retrieves them on the user's machine under the user's own AFND terms.
+- Benign-tissue immunopeptidome: HLA Ligand Atlas, CC BY 4.0.
+  https://hla-ligand-atlas.org  — `pmhc-triage fetch-ligands` retrieves release 2020.12
+  on the user's machine. CC BY 4.0 would permit redistribution with attribution; it is
+  fetched rather than bundled to keep the repository small and the release pinned by the
+  user. Cite: Marcu et al., "HLA Ligand Atlas: a benign reference of HLA-presented
+  peptides to improve T-cell-based cancer immunotherapy", J Immunother Cancer 9:e002071
+  (2021).
 - Antigen frequencies: cBioPortal (ODbL). https://www.cbioportal.org  — queried live;
   some studies carry additional non-commercial restrictions (check per study).
 
@@ -37,3 +44,5 @@ Literature
 - Marty et al. 2017, Cell 171:1272-1283 (immunoediting / PHBR). Derived summary
   statistics only (open supplement), cited in `validation/`.
 - Bui et al. 2006, Immunogenetics (HLA population-coverage method).
+- Marcu et al. 2021, J Immunother Cancer 9:e002071 (HLA Ligand Atlas; benign reference
+  immunopeptidome used by `fetch-ligands` / `crossreact --benign-ligands`).

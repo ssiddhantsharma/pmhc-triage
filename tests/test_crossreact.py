@@ -150,3 +150,21 @@ def test_annotate_presentation_leaves_hits_unknown_when_predictor_missing():
     out = cr.annotate_presentation(hits, "A*02:01", _predictor=Broken())
     assert [h.presented for h in out.value] == [None]
     assert out.warnings
+
+
+def test_cli_benign_ligands_works_without_proteome(capsys, tmp_path):
+    """--benign-ligands is its own evidence source, not a filter on the proteome scan.
+
+    Regression: the benign block was first nested inside `if a.proteome:`, so the panel
+    silently never rendered unless --proteome was also passed. Every unit test still passed,
+    because they call the scan directly and never exercise the wiring.
+    """
+    atlas = tmp_path / "benign.tsv"
+    atlas.write_text("peptide\tbinding_calls\ttissues\n"
+                     "KMAELVHFL\ts/A*02:01\tAorta, Kidney\n")
+    rc = cli.main(["crossreact", "--peptide", MAGEA3_A2, "--allele", "A*02:01",
+                   "--benign-ligands", str(atlas)])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "Benign-tissue ligands" in out
+    assert "KMAELVHFL" in out, "the zero-mismatch anchor-only mimic must surface"

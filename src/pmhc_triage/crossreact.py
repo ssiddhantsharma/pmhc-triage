@@ -19,6 +19,7 @@ from typing import Iterable, Iterator
 import numpy as np
 
 from .hla import normalize_allele, parse_locus
+from .ligandatlas import load_atlas
 from .presentation import presented_peptides
 from .provenance import Provenance, Sourced, today_iso
 
@@ -96,6 +97,67 @@ def self_scan(peptide: str, proteome: Iterable[tuple[str, str]], *, allele: str 
                 hits.append(SelfHit(acc, int(idx) + 1, frag, int(mm[idx])))
     hits.sort(key=lambda h: (h.mismatches, h.accession, h.position))
     return hits
+
+
+@dataclass
+class BenignHit:
+    """A benign-tissue ligand whose TCR-contact face matches the target."""
+
+    peptide: str
+    mismatches: int
+    tissues: tuple[str, ...]
+    binding_call: str | None   # PREDICTED s/w/n for the queried allele, None if not listed
+
+
+def scan_benign_ligands(peptide: str, ligands, *, allele: str = "", max_mismatch: int = 3,
+                        require_binding: bool = True) -> list[BenignHit]:
+    """Benign-tissue ligands matching the target at its TCR-contact positions.
+
+    Same contact-face comparison as `self_scan`, against peptides MEASURED on benign tissue
+    rather than against every window of the translated proteome. Existence in the proteome is
+    weak evidence that a mimic is ever displayed; elution from benign tissue is direct evidence
+    that it is.
+
+    Only same-length ligands are compared. A different-length ligand can still be a structural
+    mimic, which this does not attempt and which stays the scan's documented blind spot.
+
+    `require_binding` keeps ligands predicted to bind `allele` (strong or weak). That call is a
+    prediction attached to the donor's genotype, not a measured deconvolution, so it narrows
+    rather than proves; pass False to see every same-length benign match.
+    """
+    L = len(peptide)
+    contact = tcr_contact_positions(L, allele)
+    tgt = _encode(peptide)[contact]
+    hits: list[BenignHit] = []
+    for lig in ligands:
+        if len(lig.peptide) != L or lig.peptide == peptide:
+            continue
+        if require_binding and allele and not lig.binds(allele):
+            continue
+        mm = int((_encode(lig.peptide)[contact] != tgt).sum())
+        if mm <= max_mismatch:
+            hits.append(BenignHit(lig.peptide, mm, lig.tissues, lig.binding.get(allele)))
+    hits.sort(key=lambda h: (h.mismatches, h.peptide))
+    return hits
+
+
+def benign_sourced(peptide: str, allele: str, atlas_path: str, *, max_mismatch: int = 3,
+                   require_binding: bool = True) -> Sourced[list[BenignHit]]:
+    """scan_benign_ligands wrapped with provenance for the report."""
+    prov = Provenance(
+        source=f"HLA Ligand Atlas (benign tissue immunopeptidome) via {Path(atlas_path).name}",
+        query_date=today_iso(),
+        method=f"Hamming <= {max_mismatch} at TCR-contact positions vs peptides eluted from "
+               f"benign tissue" + (f"; kept predicted {allele} binders" if require_binding else ""),
+    )
+    try:
+        hits = scan_benign_ligands(peptide, load_atlas(atlas_path), allele=allele,
+                                   max_mismatch=max_mismatch, require_binding=require_binding)
+    except (OSError, ValueError) as exc:
+        return Sourced(None, prov).warn(f"could not read ligand atlas: {exc}")
+    return Sourced(hits, prov).warn(
+        "tissue and allele are separate facts here: the release README states that a "
+        "tissue-to-allele pairing cannot be deduced from the aggregated table")
 
 
 def annotate_presentation(hits: list[SelfHit], allele: str, *, threshold_percentile: float = 2.0,

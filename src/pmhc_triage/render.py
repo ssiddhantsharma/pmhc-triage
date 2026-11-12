@@ -143,8 +143,40 @@ def _agent_table(items, *, header):
     return t
 
 
+def _benign_panel(benign, top):
+    """Mimics eluted from benign tissue. Stronger evidence than a proteome match: these were
+    measured, not merely translated."""
+    if benign.value is None:
+        return Panel(Text("; ".join(benign.warnings) or "unavailable", style="yellow"),
+                     title="[bold]Benign-tissue ligands[/]", title_align="left",
+                     border_style="yellow")
+    hits = benign.value
+    body = [Text.assemble(
+        (f"{len(hits)} benign ligand(s) share the contact face  ",
+         "bold red" if hits else "bold green"),
+        (f"[{benign.provenance.method}]", "dim"))]
+    if hits:
+        t = Table(box=None, pad_edge=False, header_style="bold red")
+        for c in ("peptide", "mism", "allele call", "tissues"):
+            t.add_column(c)
+        for h in hits[:top]:
+            mc = "bold red" if h.mismatches <= 1 else ("yellow" if h.mismatches == 2 else "dim")
+            call = {"s": Text("strong", style="bold red"), "w": Text("weak", style="yellow"),
+                    "n": Text("non", style="dim")}.get(h.binding_call, Text("-", style="dim"))
+            t.add_row(Text(h.peptide, style="bold magenta"), Text(str(h.mismatches), style=mc),
+                      call, Text(", ".join(h.tissues[:4]) or "-", style="cyan"))
+        body.append(t)
+        if len(hits) > top:
+            body.append(Text(f"... +{len(hits) - top} more", style="dim"))
+    body.append(Text("the peptide was MEASURED on benign tissue; the allele call is PREDICTED "
+                     "from the donor genotype, and tissue cannot be paired to allele here",
+                     style="dim italic"))
+    return Panel(Group(*body), title="[bold]Benign-tissue ligands (HLA Ligand Atlas)[/]",
+                 title_align="left", border_style="red" if hits else "green")
+
+
 def render_crossreact(peptide, allele, contact, safety, agents, incidents, scanned,
-                      *, top=20, console=None):
+                      *, top=20, console=None, benign=None):
     console = console or Console()
     L = len(peptide)
     anchors = [i for i in range(L) if i not in contact]
@@ -204,6 +236,9 @@ def render_crossreact(peptide, allele, contact, safety, agents, incidents, scann
                          style="dim italic"))
         console.print(Panel(Group(*body), title="[bold]Proteome self-scan[/]",
                             title_align="left", border_style="red" if hits else "green"))
+
+    if benign is not None:
+        console.print(_benign_panel(benign, top))
 
     if agents:
         console.print(Panel(_agent_table(agents, header="green"),

@@ -13,10 +13,13 @@ from .burden import bundled_diseases, load_bundled, load_burden_table, manual_in
 from .caching import cached_client
 from .crossreact import (
     Agent,
+    BenignHit,
     SelfHit,
     annotate_presentation,
     antigen_safety,
+    benign_sourced,
     load_agents,
+    scan_benign_ligands,
     scan_sourced,
     self_scan,
     tcr_contact_positions,
@@ -44,6 +47,7 @@ from .identity import (
     disease_matches,
     suggest_match,
 )
+from .ligandatlas import BenignLigand, fetch_atlas, load_atlas
 from .montecarlo import (
     MCResult,
     effective_n_interval,
@@ -136,6 +140,12 @@ __all__ = [
     "tcr_contact_positions",
     "self_scan",
     "scan_sourced",
+    "scan_benign_ligands",
+    "benign_sourced",
+    "BenignHit",
+    "BenignLigand",
+    "fetch_atlas",
+    "load_atlas",
     "annotate_presentation",
     "antigen_safety",
     "load_agents",
