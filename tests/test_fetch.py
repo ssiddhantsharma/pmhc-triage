@@ -6,6 +6,8 @@ import pytest
 
 from pmhc_triage.fetch import (
     DEFAULT_POPULATIONS,
+    EmptyFetchError,
+    FetchResult,
     ReferencePopulation,
     fetch_frequencies,
     parse_afnd_table,
@@ -105,3 +107,24 @@ def test_fetch_writes_rows_and_surfaces_missing(tmp_path):
 def test_default_populations_are_distinct_labels():
     labels = [p.label for p in DEFAULT_POPULATIONS]
     assert len(labels) == len(set(labels))
+
+
+def test_write_tsv_refuses_to_clobber_a_good_file_with_an_empty_fetch(tmp_path):
+    """A total fetch failure must not destroy freqs.tsv.
+
+    freqs.tsv is the expensive artifact (every allele scraped across countries with
+    retry/backoff). Before this guard, an offline run truncated it to a bare header and
+    returned 0 with no exception, so a cron wrapper saw success.
+    """
+    p = tmp_path / "freqs.tsv"
+    good = "allele\tpopulation\tallele_frequency\tsample_size\nA*02:01\tEurope\t0.28\t12000\n"
+    p.write_text(good)
+
+    with pytest.raises(EmptyFetchError):
+        FetchResult(rows=[], warnings=["fetch failed for A*02:01"]).write_tsv(p)
+    assert p.read_text() == good  # untouched
+
+    # a real result still writes, and a first-ever write with no rows is allowed (nothing to lose)
+    assert FetchResult(rows=[("A*03:01", "Europe", 0.14, 12000)]).write_tsv(p) == 1
+    assert "A*03:01" in p.read_text()
+    assert FetchResult(rows=[]).write_tsv(tmp_path / "new.tsv") == 0

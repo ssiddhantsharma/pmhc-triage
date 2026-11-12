@@ -14,6 +14,7 @@ from .caching import cached_client
 from .crossreact import (
     Agent,
     SelfHit,
+    annotate_presentation,
     antigen_safety,
     load_agents,
     scan_sourced,
@@ -23,6 +24,7 @@ from .crossreact import (
 from .fetch import (
     COMMON_CLASS_I,
     DEFAULT_POPULATIONS,
+    EmptyFetchError,
     FetchResult,
     ReferencePopulation,
     fetch_frequencies,
@@ -45,6 +47,7 @@ from .identity import (
 from .montecarlo import (
     MCResult,
     effective_n_interval,
+    prob_greater,
     sample_antigen_fraction,
     sample_coverage,
 )
@@ -59,6 +62,7 @@ from .pipeline import TargetSpec, preflight, run_target
 from .presentation import (
     manual_presenting_alleles,
     predict_presenting_alleles,
+    presented_peptides,
     select_presenting,
     sweep_presenting_alleles,
 )
@@ -106,10 +110,12 @@ __all__ = [
     "write_provenance_json",
     "manual_presenting_alleles",
     "predict_presenting_alleles",
+    "presented_peptides",
     "select_presenting",
     "sweep_presenting_alleles",
     "MCResult",
     "effective_n_interval",
+    "prob_greater",
     "sample_antigen_fraction",
     "sample_coverage",
     "threshold_sensitivity",
@@ -117,6 +123,7 @@ __all__ = [
     "fetch_frequencies",
     "parse_afnd_table",
     "FetchResult",
+    "EmptyFetchError",
     "ReferencePopulation",
     "DEFAULT_POPULATIONS",
     "COMMON_CLASS_I",
@@ -129,6 +136,7 @@ __all__ = [
     "tcr_contact_positions",
     "self_scan",
     "scan_sourced",
+    "annotate_presentation",
     "antigen_safety",
     "load_agents",
     "SelfHit",

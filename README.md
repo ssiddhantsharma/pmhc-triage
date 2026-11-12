@@ -40,6 +40,8 @@ pmhc-triage score --gene KRAS --variant G12D --disease "pancreatic cancer" \
 
 Output: a `rich` table of per-population effective-N, a Monte-Carlo 95% interval, and a provenance record for every factor. Add `--rank` to sort targets/populations by effective addressable-N. Other commands: `discover` (disease to candidate targets), `run` (batch YAML), `validate` (fail-fast preflight).
 
+**`--rank` says which rows are actually distinguishable.** A sorted column of point estimates reads as a ranking even when the intervals swamp the gaps, so the table carries a `P(top>)` column: the probability the top row really exceeds that row, taken over the Monte-Carlo draws rather than from eyeballing interval overlap. Rows below `P=0.95` are flagged and counted ("2 rows are NOT separable from the top: read the order, not the ranking"). The comparison uses *independent* draws: every row is drawn from the same seed, and pairing them element-wise would cancel error that two separate cohorts never shared and overstate how distinguishable they are. Where uncertainty genuinely is shared this understates separability, which is the safe direction for a number people pick targets by.
+
 ## Cross-reactivity / safety axis
 
 Addressable-N tells you *how many* patients; it says nothing about whether the epitope is *safe* to target. `crossreact` adds that axis for a chosen epitope: the recognition motif (TCR-contact positions, anchors treated as wildcards; A\*01:01 anchors at P3, not the class-I default P2), a neoantigen-vs-shared-self flag, curated clinical agents, and the landmark cross-reactivity incidents.
@@ -52,11 +54,13 @@ pmhc-triage crossreact --peptide KVAELVHFL --allele "A*02:01" --proteome UP00000
 
 ![pmhc-triage crossreact output](docs/crossreact.svg)
 
+Add `--presentation` to annotate each self hit with whether the allele is predicted (MHCflurry) to actually display it: a contact-face match the allele cannot present is a false positive. It annotates and never filters, because a prediction is not strong enough evidence to delete a flagged self peptide, and "unavailable" is recorded as unknown rather than as "not presented".
+
 The self-scan (`--proteome`, any UniProt FASTA) flags self peptides matching the target at its TCR-contact positions. It catches **close** mimics (MAGE-A12 vs MAGE-A3 differ only at the P2 anchor, so the contact face is identical and flags at zero mismatch) but is **blind** to distant structural mimicry (the fatal MAGE-A3 / cardiac-titin pair differs at 4 contact positions, past any sane Hamming threshold). **Absence of a hit is not a safety guarantee**: the curated incident list ships and experimental screening stays mandatory.
 
 ## Design principles
 
-- **Provenance-first**: every number carries its source; a missing input is surfaced (`None` + reason), never silently zeroed.
+- **Provenance-first**: every number carries its source; a missing input is surfaced (`None` + reason), never silently zeroed. The same rule applies to files: `fetch-freqs` refuses to overwrite an existing `freqs.tsv` with an empty result and exits non-zero, so an AFND outage cannot quietly truncate an expensive scrape while a wrapper reads success.
 - **Join guard**: incidence × coverage combine only within the *same* population label, never across.
 - **Uncertainty visible**: factors carry sample size + CI; `effective_N` carries a seeded Monte-Carlo interval.
 - **Never bundle licensed data**: AFND (CC BY-NC) is fetched on your machine, not redistributed.

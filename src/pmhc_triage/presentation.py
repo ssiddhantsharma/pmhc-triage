@@ -95,6 +95,62 @@ def sweep_presenting_alleles(
     }
 
 
+def _load_predictor(_predictor=None):
+    """Return ``(predictor, error)``. Shared by the allele- and peptide-oriented queries so
+    the import/load failure modes are handled in exactly one place."""
+    if _predictor is not None:
+        return _predictor, None
+    try:
+        from mhcflurry import Class1PresentationPredictor
+    except ImportError:
+        return None, ("mhcflurry not installed; run `pip install 'pmhc-triage[presentation]'` "
+                      "(pulls TensorFlow) or supply alleles manually")
+    try:
+        return Class1PresentationPredictor.load(), None
+    except Exception as exc:  # pragma: no cover - environment dependent
+        return None, f"could not load MHCflurry predictor: {exc}"
+
+
+def presented_peptides(
+    peptides: Iterable[str],
+    allele: str,
+    *,
+    threshold_percentile: float = 2.0,
+    _predictor=None,
+) -> Sourced[set[str]]:
+    """Which of ``peptides`` the ONE ``allele`` is predicted to present.
+
+    The transpose of ``predict_presenting_alleles``: that asks which alleles present a
+    peptide, this asks which peptides an allele presents. Used to tell a self-scan hit that
+    could actually be displayed from one that merely matches on sequence.
+
+    Returns a surfaced *missing* result (value None) when MHCflurry is unavailable, never a
+    crash and never an empty set that would read as "nothing is presented".
+    """
+    prov = Provenance(
+        source="MHCflurry Class1PresentationPredictor",
+        query_date=today_iso(),
+        method=f"presentation percentile <= {threshold_percentile} for {allele}",
+    )
+    peptides = list(dict.fromkeys(peptides))
+    if not peptides:
+        return Sourced(set(), prov)
+
+    predictor, err = _load_predictor(_predictor)
+    if predictor is None:
+        return Sourced(None, prov).warn(err)
+    try:
+        df = predictor.predict(peptides=peptides, alleles={allele: [allele]})
+    except Exception as exc:  # pragma: no cover - environment dependent
+        return Sourced(None, prov).warn(f"MHCflurry prediction failed: {exc}")
+
+    col = "presentation_percentile"
+    if col not in df or "peptide" not in df:
+        return Sourced(None, prov).warn(f"MHCflurry output missing '{col}'/'peptide' column")
+    keep = df[df[col] <= threshold_percentile]["peptide"]
+    return Sourced(set(keep.tolist()), prov)
+
+
 def predict_presenting_alleles(
     peptides: Iterable[str],
     allele_panel: Iterable[str],
@@ -120,18 +176,9 @@ def predict_presenting_alleles(
     peptides = list(peptides)
     allele_panel = list(allele_panel)
 
+    _predictor, err = _load_predictor(_predictor)
     if _predictor is None:
-        try:
-            from mhcflurry import Class1PresentationPredictor
-        except ImportError:
-            return Sourced(None, prov).warn(
-                "mhcflurry not installed; run `pip install 'pmhc-triage[presentation]'` "
-                "(pulls TensorFlow) or supply alleles manually"
-            )
-        try:
-            _predictor = Class1PresentationPredictor.load()
-        except Exception as exc:  # pragma: no cover - environment dependent
-            return Sourced(None, prov).warn(f"could not load MHCflurry predictor: {exc}")
+        return Sourced(None, prov).warn(err)
 
     try:
         # one allele per "sample" -> per-allele presentation_percentile

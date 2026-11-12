@@ -33,6 +33,9 @@ class MCResult:
     caveats: list[str] = field(default_factory=list)
     # per-factor draw summaries, for auditing which factor dominates the spread
     components: dict = field(default_factory=dict)
+    # the effective-N draws themselves, kept so two rows can be COMPARED rather than having
+    # their intervals eyeballed. Never serialised (see to_dict): 20k floats is not provenance.
+    draws: np.ndarray | None = field(default=None, repr=False, compare=False)
 
     @property
     def computable(self) -> bool:
@@ -217,6 +220,7 @@ def effective_n_interval(
     eff = inc_draws * ag_draws * cov_draws
     s = _summ(eff)
     return MCResult(
+        draws=eff,
         median=round(s["median"], 2),
         ci95_low=round(s["ci95_low"], 2),
         ci95_high=round(s["ci95_high"], 2),
@@ -228,3 +232,25 @@ def effective_n_interval(
             "hla_coverage": {k: round(v, 6) for k, v in _summ(cov_draws).items()},
         },
     )
+
+
+def prob_greater(a: MCResult, b: MCResult, *, seed: int = 0) -> float | None:
+    """P(a > b) over the two rows' effective-N draws, or None if either is non-computable.
+
+    The draws are DECORRELATED before comparing (one side is permuted). Every row is drawn
+    from the same seed, so comparing them element-wise would treat the two as moving together
+    -- common random numbers. That is right only where the uncertainty really is shared (the
+    same AFND allele sample), and wrong across two targets whose antigen cohorts are separate
+    studies: it would cancel error that was never shared and overstate how distinguishable
+    they are, which is the failure this column exists to prevent.
+
+    So the comparison is the conservative one: independent draws. Where uncertainty genuinely
+    IS shared it understates separability rather than overstating it, which is the safe
+    direction for a number people rank targets by.
+
+    0.5 means indistinguishable; 1.0 means a beats b in every comparison.
+    """
+    if a.draws is None or b.draws is None or a.draws.size != b.draws.size or not a.draws.size:
+        return None
+    other = np.random.default_rng(seed).permutation(b.draws)
+    return float(np.mean(a.draws > other))

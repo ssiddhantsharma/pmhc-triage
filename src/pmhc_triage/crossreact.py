@@ -19,6 +19,7 @@ from typing import Iterable, Iterator
 import numpy as np
 
 from .hla import normalize_allele, parse_locus
+from .presentation import presented_peptides
 from .provenance import Provenance, Sourced, today_iso
 
 _DATA = Path(__file__).parent / "data" / "agents.yaml"
@@ -52,6 +53,9 @@ class SelfHit:
     position: int       # 1-indexed start in the protein
     peptide: str
     mismatches: int     # at the TCR-contact positions only
+    # True/False once checked against the allele, None when not checked (MHCflurry absent or
+    # --presentation not requested). None means UNKNOWN, never "not presented".
+    presented: bool | None = None
 
 
 def read_fasta(path: str) -> Iterator[tuple[str, str]]:
@@ -92,6 +96,33 @@ def self_scan(peptide: str, proteome: Iterable[tuple[str, str]], *, allele: str 
                 hits.append(SelfHit(acc, int(idx) + 1, frag, int(mm[idx])))
     hits.sort(key=lambda h: (h.mismatches, h.accession, h.position))
     return hits
+
+
+def annotate_presentation(hits: list[SelfHit], allele: str, *, threshold_percentile: float = 2.0,
+                          _predictor=None) -> Sourced[list[SelfHit]]:
+    """Mark which self hits the allele is actually predicted to present.
+
+    A sequence match at the TCR-contact positions is not a risk unless the allele can display
+    that peptide, so an unpresented hit is a false positive. This ANNOTATES and never filters:
+    hits keep their place in the table and gain a column, because a prediction is not strong
+    enough evidence to delete a flagged self-peptide on. It also cannot rescue the known blind
+    spot -- distant structural mimicry is invisible to the scan whether or not it is presented.
+    """
+    prov = Provenance(
+        source="MHCflurry Class1PresentationPredictor",
+        query_date=today_iso(),
+        method=f"self-hit presentation percentile <= {threshold_percentile} on {allele}",
+    )
+    if not hits:
+        return Sourced(hits, prov)
+    got = presented_peptides([h.peptide for h in hits], allele,
+                             threshold_percentile=threshold_percentile, _predictor=_predictor)
+    if got.value is None:
+        return Sourced(hits, prov).warn(
+            "; ".join(got.warnings) or "presentation unavailable; hits left unannotated")
+    for h in hits:
+        h.presented = h.peptide in got.value
+    return Sourced(hits, prov)
 
 
 def antigen_safety(antigen_mode: str) -> tuple[str, str]:

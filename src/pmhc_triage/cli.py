@@ -151,6 +151,9 @@ def build_parser() -> argparse.ArgumentParser:
                     help="opt-in: UniProt FASTA to self-scan for near-self mimics (default off, keeps run fast)")
     cr.add_argument("--max-mismatch", dest="max_mismatch", type=int, default=3,
                     help="max mismatches at TCR-contact positions for a self hit (default 3)")
+    cr.add_argument("--presentation", action="store_true",
+                    help="annotate self hits with whether the allele is predicted to present "
+                         "them (needs MHCflurry; annotates, never drops a hit)")
     cr.add_argument("--exclude", default="", help="comma-separated accessions to skip (the target itself)")
     cr.add_argument("--top", type=int, default=20, help="max self hits to list")
 
@@ -226,21 +229,31 @@ def _cmd_discover(a: argparse.Namespace) -> int:
 
 
 def _cmd_fetch_freqs(a: argparse.Namespace) -> int:
-    from .fetch import COMMON_CLASS_I, DEFAULT_POPULATIONS, fetch_frequencies
+    from .fetch import (
+        COMMON_CLASS_I,
+        DEFAULT_POPULATIONS,
+        EmptyFetchError,
+        fetch_frequencies,
+    )
 
     alleles = _csv_list(a.alleles) or list(COMMON_CLASS_I)
     pops = DEFAULT_POPULATIONS
     print(f"fetching {len(alleles)} alleles x {len(pops)} cohorts from AFND "
           "(your data-use under AFND CC BY-NC; not redistributed)...")
     result = fetch_frequencies(alleles, pops)
-    n = result.write_tsv(a.out)
+    try:
+        n = result.write_tsv(a.out)
+    except EmptyFetchError as e:
+        print(f"! {e}")
+        return 1
     print(f"wrote {n} (allele,population) rows -> {a.out}  [cohorts: "
           + ", ".join(f"{p.label}={p.afnd_population}" for p in pops) + "]")
     if result.warnings:
         print(f"{len(result.warnings)} surfaced (not written as 0):")
         for w in result.warnings[:12]:
             print(f"  ! {w}")
-    return 0
+    # a wrapper (cron, Makefile) must not read "wrote 0 rows" as success
+    return 0 if n else 1
 
 
 def _cmd_run(a: argparse.Namespace) -> int:
@@ -278,6 +291,10 @@ def _cmd_crossreact(a: argparse.Namespace) -> int:
     if a.proteome:
         scanned = cr.scan_sourced(pep, allele, a.proteome, max_mismatch=a.max_mismatch,
                                   exclude=_csv_list(a.exclude))
+        if a.presentation and scanned.value:
+            ann = cr.annotate_presentation(scanned.value, allele)
+            for w in ann.warnings:
+                print(f"  ! presentation: {w}")
     render_crossreact(pep, allele, contact, safety, agents, incidents, scanned, top=a.top)
     return 0
 

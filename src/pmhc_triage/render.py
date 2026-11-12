@@ -12,6 +12,12 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from .montecarlo import prob_greater
+
+# P(top > row) at or above this counts as separable. 0.95 is the usual convention, stated
+# here rather than buried: it is a threshold, not a measurement.
+SEPARABLE_P = 0.95
+
 
 def _fmt_n(v) -> str:
     return f"{v:,.0f}" if isinstance(v, (int, float)) else "n/a"
@@ -74,29 +80,42 @@ def render_rank(scores, console: Console | None = None) -> None:
     never dropped, consistent with the tool's surface-never-hide rule.
     """
     console = console or Console()
-    rows = []
-    for ts in scores:
-        for r in ts.rows():
-            rows.append((ts, r))
+    # carry the PopulationScore, not just its dict: the Monte-Carlo draws hang off it and a
+    # sorted column of point estimates reads as a ranking whether or not it is one.
+    rows = [(ts, ps.to_dict(), ps.mc) for ts in scores for ps in ts.per_population.values()]
     # sort: computable first (by effective-N desc), missing last
     rows.sort(key=lambda tr: (tr[1].get("effective_n") is None,
                               -(tr[1].get("effective_n") or 0)))
+    top_mc = next((mc for _, _, mc in rows if mc is not None and mc.draws is not None), None)
 
     t = Table(title="pmhc-triage — ranked by effective addressable-N",
               title_style="bold", title_justify="left")
     for col, just in [("target", "left"), ("population", "left"),
                       ("effective-N", "right"), ("MC 95%", "right"),
+                      ("P(top>)", "right"),
                       ("incidence", "right"), ("antigen", "right"),
                       ("coverage", "right"), ("note", "left")]:
         t.add_column(col, justify=just)
-    for ts, r in rows:
+    n_tied = 0
+    for ts, r, ps_mc in rows:
         mc = r.get("effective_n_mc_ci95")
+        p_top = None if ps_mc is None or top_mc is None else prob_greater(top_mc, ps_mc)
+        if p_top is None:
+            ptxt = Text("-", style="dim")
+        elif ps_mc is top_mc:
+            ptxt = Text("top", style="bold green")
+        elif p_top >= SEPARABLE_P:
+            ptxt = Text(f"{p_top:.2f}", style="green")
+        else:
+            ptxt = Text(f"{p_top:.2f}", style="yellow")
+            n_tied += 1
         note = "" if r.get("effective_n") is not None else "; ".join(r.get("reasons", []))[:40]
         t.add_row(
             f"{ts.gene} {ts.variant}",
             r["population"],
             _effn_text(r),
             Text(_fmt_ci(mc), style="cyan") if mc else Text("-", style="dim"),
+            ptxt,
             _fmt_n(r.get("incidence")),
             _fmt_frac(r.get("antigen_fraction")),
             _fmt_frac(r.get("hla_coverage")),
@@ -106,6 +125,11 @@ def render_rank(scores, console: Console | None = None) -> None:
     console.print(Text("effective-N = incidence x antigen-fraction x HLA-coverage; "
                        "missing rows (a factor unavailable) sort last, never dropped.",
                        style="dim"))
+    if top_mc is not None:
+        msg = (f"P(top>) is P(top row > this row) over INDEPENDENT Monte-Carlo draws, not interval "
+               f"overlap. {n_tied} row(s) are NOT separable from the top at P>={SEPARABLE_P:.2f}"
+               + (": read the order, not the ranking." if n_tied else "."))
+        console.print(Text(msg, style="yellow" if n_tied else "dim"))
 
 
 def _agent_table(items, *, header):
@@ -155,15 +179,24 @@ def render_crossreact(peptide, allele, contact, safety, agents, incidents, scann
             (f"{len(hits)} self peptide(s) within threshold  ", "bold red" if hits else "bold green"),
             (f"[{scanned.provenance.method}]", "dim"))]
         if hits:
+            annotated = any(h.presented is not None for h in hits)
             t = Table(box=None, pad_edge=False, header_style="bold red")
-            for c in ("protein", "pos", "peptide", "mism"):
+            for c in ("protein", "pos", "peptide", "mism") + (("presented",) if annotated else ()):
                 t.add_column(c)
             for h in hits[:top]:
                 mc = "bold red" if h.mismatches <= 1 else ("yellow" if h.mismatches == 2 else "dim")
-                t.add_row(Text(h.accession, style="cyan"), str(h.position),
-                          Text(h.peptide, style="bold magenta"),
-                          Text(str(h.mismatches), style=mc))
+                cells = [Text(h.accession, style="cyan"), str(h.position),
+                         Text(h.peptide, style="bold magenta"), Text(str(h.mismatches), style=mc)]
+                if annotated:
+                    cells.append({True: Text("yes", style="bold red"),
+                                  False: Text("no", style="green"),
+                                  None: Text("?", style="dim")}[h.presented])
+                t.add_row(*cells)
             body.append(t)
+            if annotated:
+                body.append(Text("presented = MHCflurry predicts this allele displays the self "
+                                 "peptide; 'no' is a likely false positive, not a cleared one "
+                                 "(hits are annotated, never dropped)", style="dim"))
             if len(hits) > top:
                 body.append(Text(f"... +{len(hits) - top} more", style="dim"))
         body.append(Text("coarse near-self screen; blind to distant mimicry "

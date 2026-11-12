@@ -11,6 +11,7 @@ import pytest
 from pmhc_triage.montecarlo import (
     MCResult,
     effective_n_interval,
+    prob_greater,
     sample_antigen_fraction,
     sample_coverage,
 )
@@ -165,3 +166,47 @@ def test_mc_duplicate_alleles_not_double_counted():
     single = effective_n_interval(covering_alleles=["A*02:01"], **kw)
     dup = effective_n_interval(covering_alleles=["A*02:01", "HLA-A*02:01"], **kw)
     assert dup.median == pytest.approx(single.median, abs=1.0)
+
+
+def _mc(inc, num, den, freq, seed=0):
+    return effective_n_interval(
+        incidence=inc, antigen_numerator=num, antigen_denominator=den,
+        covering_alleles=["A*02:01"], allele_freqs={"A*02:01": freq},
+        sample_sizes={"A*02:01": 2000}, seed=seed)
+
+
+def test_prob_greater_does_not_call_overlapping_rows_separable():
+    """The point of the column: a sorted table of point estimates is not a ranking.
+
+    `a` and `b` have clearly different medians but heavily overlapping intervals, so no
+    honest comparison should put them apart at 0.95.
+    """
+    a, b, c = _mc(10000, 27, 100, 0.28), _mc(9500, 26, 100, 0.27), _mc(2000, 10, 100, 0.10)
+    assert a.median > b.median                       # a looks better...
+    assert a.ci95_low < b.ci95_high                  # ...but the intervals overlap
+    assert prob_greater(a, b) < 0.95                 # so it is NOT separable
+    assert prob_greater(a, c) > 0.99                 # a genuinely bigger row is
+
+
+def test_prob_greater_decorrelates_rather_than_pairing_on_the_shared_seed():
+    """Every row uses the same seed. Comparing element-wise would treat two independent
+    cohorts as moving together and overstate separability; a row against ITSELF would then
+    read 0.0 instead of a coin flip."""
+    a = _mc(10000, 27, 100, 0.28)
+    assert 0.45 < prob_greater(a, a) < 0.55
+
+
+def test_prob_greater_is_none_when_either_side_is_non_computable():
+    a = _mc(10000, 27, 100, 0.28)
+    missing = effective_n_interval(
+        incidence=1.0, antigen_numerator=1, antigen_denominator=2,
+        covering_alleles=[], allele_freqs={}, sample_sizes={})
+    assert not missing.computable
+    assert prob_greater(a, missing) is None and prob_greater(missing, a) is None
+
+
+def test_draws_are_kept_but_never_serialised():
+    """20k floats are needed to compare rows and are not provenance."""
+    a = _mc(10000, 27, 100, 0.28)
+    assert a.draws is not None and a.draws.shape == (a.n_draws,)
+    assert not any("draw" in k and k != "mc_n_draws" for k in a.to_dict())

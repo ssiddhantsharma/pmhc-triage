@@ -117,3 +117,36 @@ def test_cli_crossreact_without_proteome(capsys):
     rc = cli.main(["crossreact", "--peptide", MAGEA3_A1, "--allele", "A*01:01"])
     assert rc == 0
     assert "--proteome" in capsys.readouterr().out  # prompts for the opt-in scan
+
+
+def test_annotate_presentation_marks_hits_without_dropping_any():
+    """A sequence match the allele cannot display is a false positive -- but a prediction is
+    not strong enough evidence to delete a flagged self peptide, so hits are annotated."""
+    import pandas as pd
+
+    hits = [cr.SelfHit("P1", 10, "KVAELVHFL", 0), cr.SelfHit("P2", 20, "KVAELVHFF", 1)]
+
+    class FakePredictor:
+        def predict(self, peptides, alleles):
+            # only the first is displayed by this allele
+            return pd.DataFrame([
+                {"peptide": "KVAELVHFL", "presentation_percentile": 0.2},
+                {"peptide": "KVAELVHFF", "presentation_percentile": 40.0},
+            ])
+
+    out = cr.annotate_presentation(hits, "A*02:01", _predictor=FakePredictor())
+    assert len(out.value) == 2, "annotation must never drop a flagged self peptide"
+    assert [h.presented for h in out.value] == [True, False]
+
+
+def test_annotate_presentation_leaves_hits_unknown_when_predictor_missing():
+    """Unavailable must read as UNKNOWN (None), never as 'not presented' (False)."""
+    hits = [cr.SelfHit("P1", 10, "KVAELVHFL", 0)]
+
+    class Broken:
+        def predict(self, peptides, alleles):
+            raise RuntimeError("no model")
+
+    out = cr.annotate_presentation(hits, "A*02:01", _predictor=Broken())
+    assert [h.presented for h in out.value] == [None]
+    assert out.warnings

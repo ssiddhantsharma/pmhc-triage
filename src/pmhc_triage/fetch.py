@@ -13,6 +13,7 @@ A requested (allele, population) with no AFND row is surfaced, never written as 
 from __future__ import annotations
 
 import html as _html
+import os
 import re
 import urllib.parse
 from dataclasses import dataclass, field
@@ -58,6 +59,10 @@ COMMON_CLASS_I = (
 )
 
 
+class EmptyFetchError(RuntimeError):
+    """Every fetch failed, so there is nothing to write."""
+
+
 @dataclass
 class FetchResult:
     """Rows fetched plus everything that was missing or ambiguous (surfaced)."""
@@ -67,7 +72,19 @@ class FetchResult:
     query_date: str = ""
 
     def write_tsv(self, path) -> int:
-        """Write the ``--freqs`` TSV (allele/population/allele_frequency/sample_size)."""
+        """Write the ``--freqs`` TSV (allele/population/allele_frequency/sample_size).
+
+        Refuses to write an empty result over an existing file. freqs.tsv is the expensive
+        artifact here -- every allele scraped across countries with retry/backoff -- and a
+        total fetch failure (AFND down, no network) would otherwise truncate a good file to
+        a bare header, with no exception and no exit code for a wrapper to catch.
+        """
+        if not self.rows and os.path.exists(path):
+            raise EmptyFetchError(
+                f"0 rows fetched and {path} already exists: refusing to overwrite it with an "
+                f"empty table. The existing file is untouched. "
+                f"({len(self.warnings)} fetch warning(s); check network/AFND availability.)"
+            )
         with open(path, "w") as fo:
             fo.write("allele\tpopulation\tallele_frequency\tsample_size\n")
             for allele, pop, freq, n in self.rows:
